@@ -1,0 +1,24 @@
+{
+  "name": "app",
+  "version": "1.0.50",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@logtape/elysia": "^2.3.0",
+    "@logtape/logtape": "^2.3.0",
+    "@logtape/sentry": "^2.3.0",
+    "drizzle-orm": "^0.45.2",
+    "drizzle-typebox": "^0.3.3",
+    "elysia": "latest",
+    "elysia-fsr": "^0.1.0"
+  },
+  "overrides": {
+  	"@sinclair/typebox": "0.34.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "module": "src/index.js"
+}
