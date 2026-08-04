@@ -1,8 +1,14 @@
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
+import tailwindCSS from "@tailwindcss/vite";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+ 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const viteConfig = defineConfig({
-  plugins: [solidPlugin()],
+  plugins: [tailwindCSS(), solidPlugin()],
   server: {
     port: 3000,
     proxy: {
@@ -14,6 +20,9 @@ const viteConfig = defineConfig({
   },
   resolve: {
     conditions: ["development", "browser"],
+    alias: {
+      "@": resolve(__dirname, "./src"),
+    },
   },
 });
 

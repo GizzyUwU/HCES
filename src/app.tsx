@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { ErrorBoundary, type ParentComponent } from "solid-js";
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
+import "@/styles/index.css";
 
 const RootLayout: ParentComponent = (props) => (
   <>
