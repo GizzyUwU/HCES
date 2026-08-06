@@ -5,8 +5,8 @@ import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import type { Context } from "elysia";
 
-export async function getOrCreateSession(ctx: Context) {
-  const existingId = ctx.cookie["sid"]?.value as string | undefined;
+export async function getOrCreateSession(cookie: Context["cookie"]) {
+  const existingId = cookie["sid"]?.value as string | undefined;
   if (existingId) {
     const [existing] = await db.select().from(tables.session).where(eq(tables.session.id, existingId));
     if (existing && existing.expiresAt > new Date()) return existing;
@@ -16,7 +16,7 @@ export async function getOrCreateSession(ctx: Context) {
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
   await db.insert(tables.session).values({ id, expiresAt });
 
-  ctx.cookie["sid"]!.set({
+  cookie["sid"]!.set({
     value: id,
     httpOnly: true,
     secure: true,

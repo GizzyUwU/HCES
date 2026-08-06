@@ -8,18 +8,24 @@ import { eq } from "drizzle-orm";
 export const authGuard = () =>
   new Elysia({ name: "hcaguard" })
     .use(auth)
-    .resolve(async (ctx) => {
-      if (!(await ctx.authorized("hackclub"))) {
-        ctx.set.status = 403;
+    .resolve(async ({ authorized, cookie, set }) => {
+      if (!(await authorized("hackclub"))) {
+        set.status = 403;
         throw new Response(
           JSON.stringify({ err: { status: 403, msg: "forbidden" } }),
           { status: 403, headers: { "content-type": "application/json" } },
         );
       }
 
-      const s = await getOrCreateSession(ctx);
+      const s = await getOrCreateSession(cookie);
       const [currentUser] = await db.select().from(users).where(eq(users.id, s.userId!));
-
+      if (!currentUser || Object.keys(currentUser).length === 0) {
+        set.status = 403;
+        throw new Response(
+          JSON.stringify({ err: { status: 403, msg: "forbidden" } }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        );
+      }
       return { session: { user: currentUser } };
     })
     .as("scoped");

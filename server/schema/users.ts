@@ -6,7 +6,6 @@ export const users = pgTable("users", {
   id: varchar("id")
     .$defaultFn(() => createId())
     .primaryKey(),
-  apiKeys: varchar("api_keys").unique().array(),
   slackId: varchar("slack_id").unique(),
   hcaId: varchar("hca_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

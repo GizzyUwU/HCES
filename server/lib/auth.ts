@@ -4,12 +4,12 @@ import type {
   TOAuth2Provider,
   TOAuth2AccessToken,
 } from "@bogeychan/elysia-oauth2";
-import { db } from "../index";
-import { session, oauthToken, users } from "../schema/users";
+import { db } from "@server/index";
+import { session, oauthToken, users } from "@server/schema/users";
 import { eq, and } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
-import { getOrCreateSession } from "./session";
-import { UnverifiedAccountError } from "./error";
+import { getOrCreateSession } from "@server/lib/session";
+import { UnverifiedAccountError } from "@server/lib/error";
 
 function hackClubAuth(): TOAuth2Provider {
   if (!process.env["HCA_CLIENT_ID"] || !process.env["HCA_CLIENT_SECRET"])
@@ -83,12 +83,12 @@ export const auth = oauth2({
   host: process.env["APP_HOST"] ?? "localhost:8000",
   redirectTo: `${process.env["WEB_URL"] ?? "http://localhost:3000"}/dashboard`,
   state: {
-    async check(ctx, _, state) {
-      const s = await getOrCreateSession(ctx);
+    async check({ cookie }, _, state) {
+      const s = await getOrCreateSession(cookie);
       return s.oauthState !== null && state === s.oauthState && s.expiresAt > new Date();
     },
-    async generate(ctx) {
-      const s = await getOrCreateSession(ctx);
+    async generate({ cookie }) {
+      const s = await getOrCreateSession(cookie);
       const nonce = createId();
       await db
         .update(session)
@@ -98,8 +98,8 @@ export const auth = oauth2({
     },
   },
   storage: {
-    async get(ctx, name) {
-      const s = await getOrCreateSession(ctx);
+    async get({ cookie }, name) {
+      const s = await getOrCreateSession(cookie);
       if (!s.userId) return undefined;
       const [tok] = await db
         .select()
@@ -109,8 +109,8 @@ export const auth = oauth2({
         );
       return tok?.token;
     },
-    async set(ctx, name, token) {
-      const s = await getOrCreateSession(ctx);
+    async set({ cookie }, name, token) {
+      const s = await getOrCreateSession(cookie);
 
       let userId = s.userId;
       if (userId) {
@@ -140,8 +140,10 @@ export const auth = oauth2({
       }
 
     },
-    async delete(ctx, name) {
-      const s = await getOrCreateSession(ctx);
+    async delete({
+      cookie
+    }, name) {
+      const s = await getOrCreateSession(cookie);
       if (!s.userId) return;
       await db
         .delete(oauthToken)

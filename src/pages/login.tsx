@@ -65,7 +65,6 @@ function Login() {
             <p>Error: {query.error?.message}</p>
           </Match>
           <Match when={query.isSuccess}>
-            {/*<a href={query.data?.url ?? ""}>Login via HCA</a>*/}
             <button
               class="hc-btn hc-btn-primary button"
               onClick={() => {
