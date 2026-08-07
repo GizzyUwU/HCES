@@ -26,6 +26,7 @@
     "drizzle-typebox": "^0.3.3",
     "elysia": "latest",
     "elysia-fsr": "^0.1.0",
+    "elysia-requestid": "^1.0.9",
     "pg": "^8.22.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",

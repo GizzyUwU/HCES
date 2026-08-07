@@ -1,5 +1,6 @@
 import Elysia from "elysia";
 import pkg from "@root/package.json";
+import { requestID } from "elysia-requestid";
 import zlib from "node:zlib";
 const encoder = new TextEncoder();
 
@@ -36,6 +37,10 @@ export default new Elysia()
       headers: { "Content-Type": contentType },
     });
   })
+  .use(requestID({
+    uuid: crypto.randomUUID,
+    header: "X-Request-ID"
+  }))
   .get("", () => ({
     name: pkg.name,
     version: pkg.version,

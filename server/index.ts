@@ -1,10 +1,10 @@
 import { Elysia } from "elysia";
 import fsr, { LogLevel } from "elysia-fsr";
-import { configure, getConsoleSink } from "@logtape/logtape";
+import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { auth } from "./lib/auth";
-import { UnverifiedAccountError } from "./lib/error";
+import { APIError, UnverifiedAccountError } from "./lib/error";
 import { session } from "./schema/users";
 import { eq } from "drizzle-orm";
 import { elysiaLogger } from "@logtape/elysia";
@@ -15,6 +15,7 @@ await configure({
   contextLocalStorage: new AsyncLocalStorage(),
 });
 
+export const logger = getLogger(["hces"]);
 export const db = drizzle(process.env.DATABASE_URL!);
 const routes = await fsr({
   dir: "./routes",
@@ -52,6 +53,13 @@ export const app = new Elysia()
       set.status = 302;
       set.headers.location = `${process.env.WEB_URL ?? "http://localhost:3000"}/?error=account_unverified`;
       return;
+    } else if (error instanceof APIError) {
+      set.status = error.status;
+      return new Response(
+        JSON.stringify({ err: { status: error.status, msg: error.message } }),
+      );
+    } else {
+      throw error;
     }
   })
   .use(auth)

@@ -3,11 +3,13 @@ import { auth } from "../../../../lib/auth";
 import { getOrCreateSession } from "../../../../lib/session";
 import { db } from "../../../../index";
 import { users } from "../../../../schema/users";
+import { requestID } from "elysia-requestid";
 import { eq } from "drizzle-orm";
 
 export const authGuard = () =>
   new Elysia({ name: "hcaguard" })
     .use(auth)
+    .use(requestID())
     .resolve(async ({ authorized, cookie, set }) => {
       if (!(await authorized("hackclub"))) {
         set.status = 403;
