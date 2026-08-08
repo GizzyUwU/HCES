@@ -1,10 +1,11 @@
 import { For, onMount, Show } from "solid-js";
-import { createQuery } from "@tanstack/solid-query";
+import { createMutation, createQuery } from "@tanstack/solid-query";
 import { A, useNavigate } from "@solidjs/router";
 import server from "../backend";
 import { useQueryClient } from "@tanstack/solid-query";
 import logo from "@/public/hces.webp";
 import { useToast } from "@/app";
+import { createSignal } from "solid-js";
 
 function Dashboard() {
   const queryClient = useQueryClient();
@@ -16,8 +17,12 @@ function Dashboard() {
       queryKey: ["sessionCheck"],
       queryFn: async () => {
         const result = await server.api.v1.web.login.sessionCheck.get();
-        if (!result.data)
-          return toast("Failed to pass session check due to server error.");
+        if (!result.data) {
+          toast("Failed to pass session check due to server error.");
+          return {
+            ok: false,
+          };
+        }
         return result.data;
       },
     });
@@ -28,8 +33,33 @@ function Dashboard() {
     queryKey: ["apiKeys"],
     queryFn: async () => {
       const result = await server.api.v1.web.apiKeys.get();
-      if (!result.data) return toast("Failed to query for API Keys");
+      if (!result.data) {
+        toast("Failed to query for API Keys");
+        return [];
+      }
       return result.data;
+    },
+  }));
+
+  const [label, setLabel] = createSignal("");
+
+  const createKey = createMutation(() => ({
+    mutationFn: async () => {
+      const result = await server.api.v1.web.apiKeys.post({
+        label: label() || undefined,
+      });
+      if (!result.data) {
+        toast("Failed to query for API Keys");
+        return null;
+      }
+      return result.data;
+    },
+    onSuccess: () => {
+      setLabel("");
+      queryClient.invalidateQueries({ queryKey: ["apiKeys"] });
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : "Failed to create API key");
     },
   }));
 
@@ -64,39 +94,39 @@ function Dashboard() {
           <p class="text-white">Error: {queryKeys.error?.message}</p>
         </Show>
         <Show when={queryKeys.isSuccess}>
-            <table class="border-[1.5px] border-darkless rounded">
-              <thead class="p-2">
-                <tr>
-                  <th class="py-2 pl-2 pr-3 text-left">Prefix</th>
-                  <th class="py-2 px-3 text-left">Label</th>
-                  <th class="py-2 px-3 text-left">Last Used</th>
-                  <th class="py-2 px-3 text-left">Created At</th>
-                </tr>
-              </thead>
-              <tbody class="p-2">
-                <For each={queryKeys.data!}>
-                  {(key) => (
-                    <tr>
-                      <td>
-                        <code>{key.prefix}</code>
-                      </td>
-                      <td>{key.label ?? "—"}</td>
-                      <td>
-                        {key.lastUsed
-                          ? new Date(key.lastUsed).toLocaleString()
-                          : "Never"}
-                      </td>
-                      <td>{new Date(key.createdAt).toLocaleString()}</td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-              <Show when={!queryKeys.data || queryKeys.data.length === 0}>
-                <td colSpan={4} class="text-center text-white border-none p-2">
-                  No API Keys found
-                </td>
-              </Show>
-            </table>
+          <table class="border-[1.5px] border-darkless rounded">
+            <thead class="p-2">
+              <tr>
+                <th class="py-2 pl-3 text-left">Prefix</th>
+                <th class="py-2 text-left">Label</th>
+                <th class="py-2 text-left">Last Used</th>
+                <th class="py-2 text-left">Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={queryKeys.data!}>
+                {(key) => (
+                  <tr>
+                    <td>
+                      <code class="bg-inherit pl-2 text-left">{key.prefix}</code>
+                    </td>
+                    <td>{key.label ?? "—"}</td>
+                    <td>
+                      {key.lastUsed
+                        ? new Date(key.lastUsed).toLocaleString()
+                        : "Never"}
+                    </td>
+                    <td>{new Date(key.createdAt).toLocaleString()}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+            <Show when={!queryKeys.data || queryKeys.data.length === 0}>
+              <td colSpan={4} class="text-center text-white border-none p-2">
+                No API Keys found
+              </td>
+            </Show>
+          </table>
         </Show>
         <div class="border border-darkless rounded overflow-hidden">
           <div class="p-4 flex flex-col gap">
@@ -106,15 +136,38 @@ function Dashboard() {
             <input
               id="api-key-label"
               class="hc-input bg-darkless p-2 text-white"
-              placeholder="Yummy api key"
+              placeholder={
+                createKey.isPending ||
+                (queryKeys.data && queryKeys.data.length >= 5)
+                  ? "Hit the api key limit"
+                  : "Yummy api key"
+              }
+              value={label()}
+              disabled={
+                createKey.isPending ||
+                (queryKeys.data && queryKeys.data.length >= 5)
+              }
+              onInput={(e) => setLabel(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !createKey.isPending) {
+                  createKey.mutate();
+                }
+              }}
             />
           </div>
-        
+
           <div class="bg-darkless p-3 flex items-center gap-3">
             <p class="text-white text-sm">
               You'll need an API key to use any public endpoint provided!
             </p>
-            <button class="button hc-btn-primary ml-auto">
+            <button
+              class="button hc-btn-primary ml-auto"
+              disabled={
+                createKey.isPending ||
+                (queryKeys.data && queryKeys.data.length >= 5)
+              }
+              onClick={() => createKey.mutate()}
+            >
               New API Key
             </button>
           </div>
