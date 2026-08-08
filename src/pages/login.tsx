@@ -5,6 +5,7 @@ import { useSearchParams } from "@solidjs/router";
 import { useQueryClient } from "@tanstack/solid-query";
 import "@/styles/login.css";
 import server from "@/backend";
+import { useToast } from "@/app";
 
 const errorMessages: Record<string, string> = {
   account_unverified:
@@ -13,8 +14,9 @@ const errorMessages: Record<string, string> = {
 
 function Login() {
   const nav = useNavigate();
+  const toast = useToast();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const query = createQuery(() => ({
     queryKey: ["redirectURL"],
     queryFn: async () => {
@@ -33,7 +35,14 @@ function Login() {
       : null;
   };
 
+  const dismissError = () => setSearchParams({ error: undefined });
+
   onMount(async () => {
+    const message = authError();
+    if (message) {
+      setSearchParams({ error: undefined }, { replace: true });
+      toast(message);
+    }
     const data = await queryClient.fetchQuery({
       queryKey: ["sessionCheck"],
       queryFn: async () => {
@@ -47,22 +56,31 @@ function Login() {
 
   return (
     <div class="bg-dark">
+      <Show when={authError()}>
+        {(message) => (
+          <div class="absolute top-0 inset-x-0 flex justify-center mt-3">
+            <div
+              class="button bg-orange text-background whitespace-nowrap w-fit!"
+              onClick={dismissError}
+            >
+              {message()}
+            </div>
+          </div>
+        )}
+      </Show>
       <div class="h-screen flex flex-col justify-center items-center">
-        <h1 class="hc-text-heading text-5 text-white">
-          HCES
-        </h1>
+        <h1 class="hc-text-heading text-5 text-white">HCES</h1>
         <h2 class="hc-text-heading text-2 text-secondary-dark">
           Hack Club Event Scraper
         </h2>
         <br />
 
-        <Show when={authError()}>{(message) => <p>{message()}</p>}</Show>
         <Switch>
           <Match when={query.isLoading}>
-            <p>Loading...</p>
+            <p class="text-white">Loading...</p>
           </Match>
           <Match when={query.isError}>
-            <p>Error: {query.error?.message}</p>
+            <p class="text-white">Error: {query.error?.message}</p>
           </Match>
           <Match when={query.isSuccess}>
             <button

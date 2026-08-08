@@ -49,7 +49,7 @@ async function resolveOrCreateUser(token: TOAuth2AccessToken) {
       slack_id: string;
     };
   };
-  if (me.identity.verification_status !== "verified" || me.identity.ysws_eligible) throw new UnverifiedAccountError();
+  if (me.identity.verification_status !== "verified" || !me.identity.ysws_eligible) throw new UnverifiedAccountError();
 
   const [existing] = await db
     .select()

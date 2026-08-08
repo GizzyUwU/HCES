@@ -38,7 +38,7 @@ export default new Elysia()
     });
   })
   .use(requestID({
-    uuid: crypto.randomUUID,
+    uuid: crypto.randomUUID.bind(crypto),
     header: "X-Request-ID"
   }))
   .get("", () => ({

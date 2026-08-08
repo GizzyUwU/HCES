@@ -20,8 +20,8 @@ function Dashboard() {
   })
 
   return (
-    <div>
-      Goog... Successfully authed!
+    <div class="bg-dark">
+      <nav class="bg-black"></nav>
     </div>
   );
 }

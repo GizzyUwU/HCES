@@ -8,10 +8,43 @@ import { APIError, UnverifiedAccountError } from "./lib/error";
 import { session } from "./schema/users";
 import { eq } from "drizzle-orm";
 import { elysiaLogger } from "@logtape/elysia";
+import * as Sentry from "@sentry/bun";
+import { getSentrySink } from "@logtape/sentry";
+
+if (process.env["SENTRY_DSN"]) {
+  Sentry.init({
+    dsn: process.env["SENTRY_DSN"],
+    release:
+      process.env["GIT_COMMIT_SHA"] || process.env["SENTRY_NAME"] || "hces",
+    environment:
+      Boolean(process.env["PRODUCTION"]) === true
+        ? "production"
+        : "development",
+    tracesSampleRate: 0.01,
+  });
+}
+
+const logLevel = {
+  1: "warning",
+  2: "trace",
+  3: "info",
+  4: "fatal",
+  5: "error",
+  6: "debug",
+} as const;
 
 await configure({
-  sinks: { console: getConsoleSink() },
-  loggers: [{ category: ["hces"], sinks: ["console"], lowestLevel: "info" }],
+  sinks: { console: getConsoleSink(), sentry: getSentrySink() },
+  loggers: [
+    {
+      category: ["hces"],
+      sinks: [
+        "console",
+        ...(process.env["SENTRY_DSN"] ? (["sentry"] as const) : []),
+      ],
+      lowestLevel: logLevel[Number(process.env["LOG_LEVEL"]) as keyof typeof logLevel]  ?? "info",
+    },
+  ],
   contextLocalStorage: new AsyncLocalStorage(),
 });
 
