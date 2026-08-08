@@ -9,7 +9,8 @@ import { session, oauthToken, users } from "@server/schema/users";
 import { eq, and } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { getOrCreateSession } from "@server/lib/session";
-import { UnverifiedAccountError } from "@server/lib/error";
+import { APIError, UnverifiedAccountError } from "@server/lib/error";
+import { logger } from "@server/index";
 
 function hackClubAuth(): TOAuth2Provider {
   if (!process.env["HCA_CLIENT_ID"] || !process.env["HCA_CLIENT_SECRET"])
@@ -49,17 +50,31 @@ async function resolveOrCreateUser(token: TOAuth2AccessToken) {
       slack_id: string;
     };
   };
-  if (me.identity.verification_status !== "verified" || !me.identity.ysws_eligible) throw new UnverifiedAccountError();
+  if (
+    me.identity.verification_status !== "verified" ||
+    !me.identity.ysws_eligible
+  )
+    throw new UnverifiedAccountError();
 
   const [existing] = await db
     .select()
     .from(users)
     .where(eq(users.hcaId, me.identity.id));
-  if (existing && existing.slackId !== me.identity.slack_id) {
-    await db
-      .update(users)
-      .set({ slackId: me.identity.slack_id })
-      .where(eq(users.id, existing.id));
+  if (existing) {
+    if (existing.slackId !== me.identity.slack_id) {
+      try {
+        await db
+          .update(users)
+          .set({ slackId: me.identity.slack_id })
+          .where(eq(users.id, existing.id));
+      } catch (err) {
+        logger.error("Failed updating user's slack id to match the slack id returned by HCA", { error: err });
+        throw new APIError({
+          status: 500,
+          msg: "internal_server_error"
+        })
+      }
+    }
     return existing.id;
   }
 
@@ -67,7 +82,7 @@ async function resolveOrCreateUser(token: TOAuth2AccessToken) {
     .insert(users)
     .values({
       slackId: me.identity.slack_id,
-      hcaId: me.identity.id
+      hcaId: me.identity.id,
     })
     .returning();
   return created!.id;
@@ -85,7 +100,11 @@ export const auth = oauth2({
   state: {
     async check({ cookie }, _, state) {
       const s = await getOrCreateSession(cookie);
-      return s.oauthState !== null && state === s.oauthState && s.expiresAt > new Date();
+      return (
+        s.oauthState !== null &&
+        state === s.oauthState &&
+        s.expiresAt > new Date()
+      );
     },
     async generate({ cookie }) {
       const s = await getOrCreateSession(cookie);
@@ -138,11 +157,8 @@ export const auth = oauth2({
       if (!s.userId) {
         await db.update(session).set({ userId }).where(eq(session.id, s.id));
       }
-
     },
-    async delete({
-      cookie
-    }, name) {
+    async delete({ cookie }, name) {
       const s = await getOrCreateSession(cookie);
       if (!s.userId) return;
       await db

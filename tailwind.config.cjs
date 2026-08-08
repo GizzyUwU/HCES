@@ -160,16 +160,152 @@ module.exports = {
           color: theme('colors.text'),
           margin: '0',
           minHeight: '100vh',
+          textRendering: 'optimizeLegibility',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+        },
+        h1: {
+          fontWeight: theme('fontWeight.bold'),
+          lineHeight: theme('lineHeight.heading'),
+          marginTop: '0',
+          marginBottom: '0',
+          fontSize: theme('fontSize.5'),
+        },
+        h2: {
+          fontWeight: theme('fontWeight.bold'),
+          lineHeight: theme('lineHeight.heading'),
+          marginTop: '0',
+          marginBottom: '0',
+          fontSize: theme('fontSize.4'),
+        },
+        h3: {
+          fontWeight: theme('fontWeight.bold'),
+          lineHeight: theme('lineHeight.heading'),
+          marginTop: '0',
+          marginBottom: '0',
+          fontSize: theme('fontSize.3'),
+        },
+        h4: {
+          fontWeight: theme('fontWeight.bold'),
+          lineHeight: theme('lineHeight.heading'),
+          marginTop: '0',
+          marginBottom: '0',
+          fontSize: theme('fontSize.2'),
+        },
+        h5: {
+          fontWeight: theme('fontWeight.bold'),
+          lineHeight: theme('lineHeight.heading'),
+          marginTop: '0',
+          marginBottom: '0',
+          fontSize: theme('fontSize.1'),
+        },
+        h6: {
+          fontWeight: theme('fontWeight.bold'),
+          lineHeight: theme('lineHeight.heading'),
+          marginTop: '0',
+          marginBottom: '0',
+          fontSize: theme('fontSize.0'),
+        },
+        p: {
+          color: theme('colors.text'),
+          fontWeight: theme('fontWeight.body'),
+          lineHeight: theme('lineHeight.body'),
+          marginTop: theme('spacing.3'),
+          marginBottom: theme('spacing.3'),
+        },
+        img: {
+          maxWidth: '100%',
+        },
+        hr: {
+          border: '0',
+          borderBottom: '1px solid',
+          borderColor: theme('colors.border'),
         },
         a: {
           color: theme('colors.primary'),
           textDecoration: 'underline',
+          textUnderlinePosition: 'under',
+          '&:focus, &:hover': {
+            textDecorationStyle: 'wavy',
+          },
+        },
+        pre: {
+          fontFamily: theme('fontFamily.mono'),
+          fontSize: theme('fontSize.1'),
+          padding: theme('spacing.3'),
+          color: theme('colors.text'),
+          backgroundColor: theme('colors.sunken'),
+          overflow: 'auto',
+          borderRadius: theme('borderRadius.DEFAULT'),
+          code: {
+            color: 'inherit',
+            marginLeft: '0',
+            marginRight: '0',
+            paddingLeft: '0',
+            paddingRight: '0',
+            '.comment, .prolog, .doctype, .cdata, .punctuation, .operator, .entity, .url': {
+              color: theme('colors.muted'),
+            },
+            '.comment': {
+              fontStyle: 'italic',
+            },
+            '.property, .tag, .boolean, .number, .constant, .symbol, .deleted, .function, .class-name, .regex, .important, .variable': {
+              color: theme('colors.red'),
+            },
+            '.atrule, .attr-value, .keyword': {
+              color: theme('colors.blue'),
+            },
+            '.selector, .attr-name, .string, .char, .builtin, .inserted': {
+              color: theme('colors.orange'),
+            },
+          },
         },
         code: {
           fontFamily: theme('fontFamily.mono'),
+          fontSize: 'inherit',
           color: theme('colors.purple'),
           backgroundColor: theme('colors.sunken'),
           borderRadius: theme('borderRadius.small'),
+          marginLeft: theme('spacing.1'),
+          marginRight: theme('spacing.1'),
+          paddingLeft: theme('spacing.1'),
+          paddingRight: theme('spacing.1'),
+        },
+        'p > code, li > code': {
+          color: theme('colors.purple'),
+          fontSize: '0.875em',
+        },
+        'p > a > code, li > a > code': {
+          color: theme('colors.red'),
+          fontSize: '0.875em',
+        },
+        li: {
+          marginTop: theme('spacing.2'),
+          marginBottom: theme('spacing.2'),
+        },
+        table: {
+          width: '100%',
+          marginTop: theme('spacing.4'),
+          marginBottom: theme('spacing.4'),
+          borderCollapse: 'separate',
+          borderSpacing: 0,
+          'th, td': {
+            textAlign: 'left',
+            paddingTop: '4px',
+            paddingBottom: '4px',
+            paddingRight: '4px',
+            paddingLeft: '0',
+            borderColor: theme('colors.border'),
+            borderBottomStyle: 'solid',
+          },
+        },
+        th: {
+          verticalAlign: 'bottom',
+          borderBottomWidth: '2px',
+        },
+        td: {
+          verticalAlign: 'top',
+          borderBottomWidth: '1px',
         },
       })
       addComponents({
@@ -240,11 +376,19 @@ module.exports = {
           textDecoration: 'none',
           WebkitTapHighlightColor: 'transparent',
           transition: 'transform .125s ease-in-out, box-shadow .125s ease-in-out, background-color .125s ease-in-out',
+          '&:focus, &:hover': {
+            boxShadow: theme('boxShadow.elevated'),
+            transform: 'scale(1.0625)',
+          },
           '&:disabled': {
             cursor: 'not-allowed',
             opacity: '0.6',
             transform: 'none',
             boxShadow: theme('boxShadow.card'),
+          },
+          svg: {
+            marginLeft: `-${theme('spacing.1')}`,
+            marginRight: theme('spacing.2'),
           },
         },
         '.hc-btn-lg': {
@@ -259,6 +403,28 @@ module.exports = {
           backgroundColor: 'transparent',
           color: theme('colors.primary'),
           border: '2px solid currentColor',
+        },
+        '.hc-btn-outline-lg': {
+          backgroundColor: 'transparent',
+          color: theme('colors.primary'),
+          border: '2px solid currentColor',
+          lineHeight: theme('lineHeight.title'),
+          fontSize: theme('fontSize.3'),
+          paddingLeft: theme('spacing.4'),
+          paddingRight: theme('spacing.4'),
+          paddingTop: theme('spacing.3'),
+          paddingBottom: theme('spacing.3'),
+        },
+        '.hc-btn-cta': {
+          fontSize: theme('fontSize.2'),
+        },
+        '.hc-btn-cta-lg': {
+          lineHeight: theme('lineHeight.title'),
+          fontSize: theme('fontSize.3'),
+          paddingLeft: theme('spacing.4'),
+          paddingRight: theme('spacing.4'),
+          paddingTop: theme('spacing.3'),
+          paddingBottom: theme('spacing.3'),
         },
         '.hc-card-primary': {
           backgroundColor: theme('colors.elevated'),
@@ -279,6 +445,38 @@ module.exports = {
           textDecoration: 'none',
           WebkitTapHighlightColor: 'transparent',
           transition: 'transform .125s ease-in-out, box-shadow .125s ease-in-out',
+          '&:hover, &:focus': {
+            transform: 'scale(1.0625)',
+            boxShadow: theme('boxShadow.elevated'),
+          },
+        },
+        '.hc-card-translucent': {
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          color: theme('colors.text'),
+          boxShadow: 'none',
+          '@supports (-webkit-backdrop-filter: none) or (backdrop-filter: none)': {
+            backgroundColor: 'rgba(255, 255, 255, 0.75)',
+            backdropFilter: 'saturate(180%) blur(20px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          },
+          '@media (prefers-reduced-transparency: reduce)': {
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+          },
+        },
+        '.hc-card-translucent-dark': {
+          backgroundColor: 'rgba(0, 0, 0, 0.875)',
+          color: theme('colors.white'),
+          boxShadow: 'none',
+          '@supports (-webkit-backdrop-filter: none) or (backdrop-filter: none)': {
+            backgroundColor: 'rgba(0, 0, 0, 0.625)',
+            backdropFilter: 'saturate(180%) blur(16px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(16px)',
+          },
+          '@media (prefers-reduced-transparency: reduce)': {
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+          },
         },
         '.hc-alert-primary': {
           borderRadius: theme('borderRadius.DEFAULT'),
@@ -295,6 +493,9 @@ module.exports = {
           '&::placeholder': {
             color: theme('colors.placeholder'),
           },
+          '&[type="search"]::-webkit-search-decoration': {
+            display: 'none',
+          },
         },
         '.hc-label': {
           color: theme('colors.text'),
@@ -303,6 +504,72 @@ module.exports = {
           textAlign: 'left',
           lineHeight: theme('lineHeight.caption'),
           fontSize: theme('fontSize.2'),
+        },
+        '.hc-label-horiz': {
+          color: theme('colors.text'),
+          display: 'flex',
+          alignItems: 'center',
+          textAlign: 'left',
+          lineHeight: theme('lineHeight.caption'),
+          fontSize: theme('fontSize.2'),
+          svg: {
+            color: theme('colors.muted'),
+          },
+        },
+        '.hc-slider': {
+          color: theme('colors.primary'),
+        },
+        '.hc-visually-hidden': {
+          position: 'absolute',
+          height: '1px',
+          width: '1px',
+          overflow: 'hidden',
+          clip: 'rect(1px, 1px, 1px, 1px)',
+          whiteSpace: 'nowrap',
+        },
+        '.hc-container': {
+          maxWidth: theme('maxWidth.layout'),
+          width: '100%',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          paddingLeft: theme('spacing.3'),
+          paddingRight: theme('spacing.3'),
+          '@screen md': {
+            maxWidth: theme('maxWidth.layoutPlus'),
+          },
+        },
+        '.hc-container-wide': {
+          maxWidth: theme('maxWidth.layout'),
+          width: '100%',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          paddingLeft: theme('spacing.3'),
+          paddingRight: theme('spacing.3'),
+          '@screen md': {
+            maxWidth: theme('maxWidth.wide'),
+          },
+        },
+        '.hc-container-copy': {
+          maxWidth: theme('maxWidth.copy'),
+          width: '100%',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          paddingLeft: theme('spacing.3'),
+          paddingRight: theme('spacing.3'),
+          '@screen md': {
+            maxWidth: theme('maxWidth.copyPlus'),
+          },
+        },
+        '.hc-container-narrow': {
+          maxWidth: theme('maxWidth.narrow'),
+          width: '100%',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          paddingLeft: theme('spacing.3'),
+          paddingRight: theme('spacing.3'),
+          '@screen md': {
+            maxWidth: theme('maxWidth.narrowPlus'),
+          },
         },
       })
     }),

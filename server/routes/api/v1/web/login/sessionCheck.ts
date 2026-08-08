@@ -9,7 +9,7 @@ export default new Elysia()
   .use(auth)
   .get("", async (ctx) => {
     if (!(await ctx.authorized("hackclub"))) return { ok: false };
-    const s = await getOrCreateSession(ctx as any);
+    const s = await getOrCreateSession(ctx.cookie);
     if (!s.userId) return { ok: false };
 
     const [user] = await db

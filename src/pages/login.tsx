@@ -6,11 +6,7 @@ import { useQueryClient } from "@tanstack/solid-query";
 import "@/styles/login.css";
 import server from "@/backend";
 import { useToast } from "@/app";
-
-const errorMessages: Record<string, string> = {
-  account_unverified:
-    "Your Hack Club account must be verified before you can sign in.",
-};
+import errorMessages from "@/errors";
 
 function Login() {
   const nav = useNavigate();
