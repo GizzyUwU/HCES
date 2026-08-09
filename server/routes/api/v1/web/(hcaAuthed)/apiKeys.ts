@@ -206,7 +206,7 @@ export default new Elysia()
         .where(
           and(eq(tables.apiKeys.userId, user.id), eq(tables.apiKeys.id, id)),
         );
-      if (exist.length === 0)
+      if (exist.length > 0)
         throw new APIError({
           status: 404,
           msg: "apikey_doesnt_exist",

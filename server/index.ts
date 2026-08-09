@@ -65,25 +65,41 @@ const routes = await fsr({
   dir: "./routes",
   filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
   logLevel: LogLevel.Default,
-  // types: {
-  //   dir: "./server/types",
-  //   importAlias: "import-route-files-alias",
-  // },
 });
 
 export const app = new Elysia()
   .use(
     elysiaLogger({
       category: ["hces"],
+      logRequest: false, 
+      format: (ctx, responseTime) => ({
+        method: ctx.request.method,
+        path: ctx.path,
+        status: ctx.set.status,
+        duration: responseTime
+      }),
       context: {
         requestId: {
           headerNames: ["x-correlation-id", "x-request-id"],
           responseHeader: "x-request-id",
         },
         include: ["requestId", "method", "path"],
-        enrich: (ctx) => {
-            return { route: ctx.path };
-          },
+        enrich: async (ctx) => {
+          const cookieHeader = ctx.request.headers.get("cookie") ?? "";
+          const sid = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/)?.[1];
+        
+          let userId: string | undefined;
+          if (sid) {
+            const [s] = await db
+              .select({ userId: session.userId })
+              .from(session)
+              .where(eq(session.id, sid))
+              .limit(1);
+            userId = s?.userId ?? undefined;
+          }
+        
+          return { route: ctx.path, userId };
+        },
       },
     }),
   )
