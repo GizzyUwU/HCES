@@ -1,32 +1,38 @@
 import { For, onMount, Show } from "solid-js";
 import { createMutation, createQuery } from "@tanstack/solid-query";
 import { A, useNavigate } from "@solidjs/router";
-import server from "../backend";
+import server, { isApiError, resolveErrorMessage } from "../backend";
 import { useQueryClient } from "@tanstack/solid-query";
-import logo from "@/public/hces.webp";
+import logo from "@/public/orpheus-hces.webp";
 import { useToast } from "@/app";
 import { createSignal } from "solid-js";
-
 function Dashboard() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const nav = useNavigate();
+  const [label, setLabel] = createSignal("");
 
   onMount(async () => {
-    const data = await queryClient.fetchQuery({
-      queryKey: ["sessionCheck"],
-      queryFn: async () => {
-        const result = await server.api.v1.web.login.sessionCheck.get();
-        if (!result.data) {
-          toast("Failed to pass session check due to server error.");
-          return {
-            ok: false,
-          };
-        }
-        return result.data;
-      },
-    });
-    if (!data || !data.ok) return nav("/");
+    try {
+      const data = await queryClient.fetchQuery({
+        queryKey: ["sessionCheck"],
+        queryFn: async () => {
+          const result = await server.api.v1.web.login.sessionCheck.get();
+          if (!result.data) {
+            toast("Failed to pass session check due to server error.");
+            return {
+              ok: false,
+            };
+          }
+          return result.data;
+        },
+        retry: false,
+      });
+      if (!data || !data.ok) return nav("/");
+    } catch (e) {
+      toast("Session check failed — please log in again.");
+      nav("/");
+    }
   });
 
   const queryKeys = createQuery(() => ({
@@ -36,12 +42,13 @@ function Dashboard() {
       if (!result.data) {
         toast("Failed to query for API Keys");
         return [];
+      } else if (isApiError(result.data)) {
+        toast(resolveErrorMessage(result.data.err, "Internal server error"));
+        return [];
       }
       return result.data;
     },
   }));
-
-  const [label, setLabel] = createSignal("");
 
   const createKey = createMutation(() => ({
     mutationFn: async () => {
@@ -51,6 +58,9 @@ function Dashboard() {
       if (!result.data) {
         toast("Failed to query for API Keys");
         return null;
+      } else if (isApiError(result.data)) {
+        toast(resolveErrorMessage(result.data.err, "Internal server error"));
+        return null;
       }
       return result.data;
     },
@@ -59,20 +69,53 @@ function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["apiKeys"] });
     },
     onError: (err) => {
-      toast(err instanceof Error ? err.message : "Failed to create API key");
+      if (isApiError(err)) {
+        toast(resolveErrorMessage(err.err.msg, "Internal server error"));
+      } else {
+        toast(err instanceof Error ? err.message : "Failed to create API key");
+      }
+    },
+  }));
+
+  const deleteKey = createMutation(() => ({
+    mutationFn: async (id: string) => {
+      const result = await server.api.v1.web.apiKeys.delete({
+        id,
+      });
+      if (!result.data) {
+        toast("Failed to query for API Keys");
+        return null;
+      } else if (isApiError(result.data)) {
+        toast(resolveErrorMessage(result.data.err, "Internal server error"));
+        return null;
+      }
+      return result.data;
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({
+        queryKey: ["apiKeys"],
+      });
+      createKey.reset();
+    },
+    onError: (err) => {
+      if (isApiError(err)) {
+        toast(resolveErrorMessage(err.err.msg, "Internal server error"));
+      } else {
+        toast(err instanceof Error ? err.message : "Failed to create API key");
+      }
     },
   }));
 
   return (
     <div class="bg-dark h-screen text-white overflow-y-hidden">
-      <nav class="bg-darkless min-h-[44px] flex items-center">
-        <div class="-ml-px mt-1">
-          <img src={logo} title="HCES" class="text-2 h-4 rotate-[8deg]" />
+      <nav class="border-b border-b-darkless min-h-[56px] flex items-center relative ">
+        <div class="-ml-px mt-2 absolute">
+          <img src={logo} title="HCES" class="text-2 h-5" />
         </div>
-        <div class="mr-2 ml-auto flex gap-2">
+        <div class="flex gap-2 ml-[120px]">
           <A
             href="/stats"
-            class="no-underline text-white  hover:text-secondary-dark"
+            class="no-underline text-white hover:text-secondary-dark"
           >
             Statistics
           </A>
@@ -83,6 +126,9 @@ function Dashboard() {
             Manage
           </A>
         </div>
+        <button class="no-underline text-white hover:text-secondary-dark ml-auto mr-3 cursor-pointer">
+          Logout
+        </button>
       </nav>
       <main class="hc-container mt-4 h-screen text-white">
         <h1 class="hc-text-heading text-4">Your API Keys</h1>
@@ -94,35 +140,77 @@ function Dashboard() {
           <p class="text-white">Error: {queryKeys.error?.message}</p>
         </Show>
         <Show when={queryKeys.isSuccess}>
-          <table class="border-[1.5px] border-darkless rounded">
-            <thead class="p-2">
+          <table class="bg-darkless rounded">
+            <thead>
               <tr>
-                <th class="py-2 pl-3 text-left">Prefix</th>
-                <th class="py-2 text-left">Label</th>
-                <th class="py-2 text-left">Last Used</th>
-                <th class="py-2 text-left">Created At</th>
+                <th class="p-2 text-left">Prefix</th>
+                <th class="p-2 text-left">Label</th>
+                <th class="p-2 text-left">Last Used</th>
+                <th class="p-2 text-left">Created At</th>
+                <th class="p-2 text-left">Delete</th>
               </tr>
             </thead>
             <tbody>
               <For each={queryKeys.data!}>
-                {(key) => (
+                {(key, i) => (
                   <tr>
-                    <td>
-                      <code class="bg-inherit pl-2 text-left">{key.prefix}</code>
+                    <td
+                      classList={{
+                        "border-none": i() === queryKeys.data!.length - 1,
+                        "p-2": true,
+                      }}
+                    >
+                      {key.prefix}
                     </td>
-                    <td>{key.label ?? "—"}</td>
-                    <td>
+                    <td
+                      classList={{
+                        "border-none": i() === queryKeys.data!.length - 1,
+                        "p-2": true,
+                      }}
+                    >
+                      {key.label ?? "—"}
+                    </td>
+                    <td
+                      classList={{
+                        "border-none": i() === queryKeys.data!.length - 1,
+                        "p-2": true,
+                      }}
+                    >
                       {key.lastUsed
                         ? new Date(key.lastUsed).toLocaleString()
                         : "Never"}
                     </td>
-                    <td>{new Date(key.createdAt).toLocaleString()}</td>
+                    <td
+                      classList={{
+                        "border-none": i() === queryKeys.data!.length - 1,
+                        "p-2": true,
+                      }}
+                    >
+                      {new Date(key.createdAt).toLocaleString()}
+                    </td>
+                    <td
+                      classList={{
+                        "border-none": i() === queryKeys.data!.length - 1,
+                        "align-middle": true,
+                        "p-2": true,
+                        "items-center": true,
+                      }}
+                    >
+                      <button
+                        class="cursor-pointer inline-flex items-center justify-center text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled={deleteKey.isPending}
+                        onClick={() => deleteKey.mutate(key.id)}
+                        title="Delete API key"
+                      >
+                        Delete?
+                      </button>
+                    </td>
                   </tr>
                 )}
               </For>
             </tbody>
             <Show when={!queryKeys.data || queryKeys.data.length === 0}>
-              <td colSpan={4} class="text-center text-white border-none p-2">
+              <td colSpan={5} class="text-center text-white border-none p-2">
                 No API Keys found
               </td>
             </Show>
@@ -130,6 +218,10 @@ function Dashboard() {
         </Show>
         <div class="border border-darkless rounded overflow-hidden">
           <div class="p-4 flex flex-col gap">
+            <Show when={createKey.isSuccess}>
+              <div class="text-center">Here is your API Key!</div>
+              <div class="text-center text-primary">{createKey.data?.key}</div>
+            </Show>
             <label for="api-key-label" class="text-sm text-white/70">
               Label
             </label>
@@ -139,7 +231,7 @@ function Dashboard() {
               placeholder={
                 createKey.isPending ||
                 (queryKeys.data && queryKeys.data.length >= 5)
-                  ? "Hit the api key limit"
+                  ? "You have hit the api key limit"
                   : "Yummy api key"
               }
               value={label()}

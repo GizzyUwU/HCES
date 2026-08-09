@@ -36,7 +36,7 @@
     "jsxImportSource": "solid-js",
 
     /* Types */
-    "types": ["vite/client", "bun-types"],
+    "types": ["vite/client", "bun-types", "unplugin-icons/types/solid"],
   },
   "exclude": ["node_modules", "coverage", "dist", "public"],
 }

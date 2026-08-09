@@ -5,6 +5,7 @@ import { db } from "../../../../index";
 import { users } from "../../../../schema/users";
 import { requestID } from "elysia-requestid";
 import { eq } from "drizzle-orm";
+import { APIError } from "@server/lib/error";
 
 export const authGuard = () =>
   new Elysia({ name: "hcaguard" })
@@ -12,21 +13,19 @@ export const authGuard = () =>
     .use(requestID())
     .resolve(async ({ authorized, cookie, set }) => {
       if (!(await authorized("hackclub"))) {
-        set.status = 403;
-        throw new Response(
-          JSON.stringify({ err: { status: 403, msg: "forbidden" } }),
-          { status: 403, headers: { "content-type": "application/json" } },
-        );
+        throw new APIError({
+          status: 403,
+          msg: "forbidden"
+        })
       }
 
       const s = await getOrCreateSession(cookie);
       const [currentUser] = await db.select().from(users).where(eq(users.id, s.userId!));
       if (!currentUser || Object.keys(currentUser).length === 0) {
-        set.status = 403;
-        throw new Response(
-          JSON.stringify({ err: { status: 403, msg: "forbidden" } }),
-          { status: 403, headers: { "content-type": "application/json" } },
-        );
+        throw new APIError({
+          status: 403,
+          msg: "forbidden"
+        })
       }
       return { session: { user: currentUser } };
     })
