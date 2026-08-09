@@ -35,6 +35,15 @@ const logLevel = {
 
 await configure({
   sinks: { console: getConsoleSink(), sentry: getSentrySink() },
+  filters: {
+    notExpectedClientError: (record) =>
+      !(
+        record.level === "error" &&
+        typeof record.properties["status"] === "number" &&
+        (record.properties["status"] as number) >= 400 &&
+        (record.properties["status"] as number) < 500
+      ),
+  },
   loggers: [
     {
       category: ["hces"],
@@ -42,7 +51,9 @@ await configure({
         "console",
         ...(process.env["SENTRY_DSN"] ? (["sentry"] as const) : []),
       ],
-      lowestLevel: logLevel[Number(process.env["LOG_LEVEL"]) as keyof typeof logLevel]  ?? "info",
+      lowestLevel:
+        logLevel[Number(process.env["LOG_LEVEL"]) as keyof typeof logLevel] ??
+        "info",
     },
   ],
   contextLocalStorage: new AsyncLocalStorage(),
@@ -70,7 +81,9 @@ export const app = new Elysia()
           responseHeader: "x-request-id",
         },
         include: ["requestId", "method", "path"],
-        enrich: (ctx) => ({ route: ctx.path }),
+        enrich: (ctx) => {
+            return { route: ctx.path };
+          },
       },
     }),
   )
@@ -88,9 +101,9 @@ export const app = new Elysia()
       return;
     } else if (error instanceof APIError) {
       set.status = error.status;
-      return new Response(
-        JSON.stringify({ err: { status: error.status, msg: error.message } }),
-      );
+      return {
+        err: { status: error.status, msg: error.message },
+      };
     } else {
       throw error;
     }

@@ -12,22 +12,27 @@ export const authGuard = () =>
     .use(auth)
     .use(requestID())
     .resolve(async ({ authorized, cookie, set }) => {
-      if (!(await authorized("hackclub"))) {
+      if (!(await authorized("hackclub")))
         throw new APIError({
           status: 403,
-          msg: "forbidden"
-        })
-      }
+          msg: "forbidden",
+        });
 
       const s = await getOrCreateSession(cookie);
-      const [currentUser] = await db.select().from(users).where(eq(users.id, s.userId!));
-      if (!currentUser || Object.keys(currentUser).length === 0) {
+      const [currentUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, s.userId!));
+      if (!currentUser || Object.keys(currentUser).length === 0)
         throw new APIError({
           status: 403,
-          msg: "forbidden"
-        })
-      }
+          msg: "forbidden",
+        });
+      set.headers["X-User-Id"] = currentUser.id;
       return { session: { user: currentUser } };
+    })
+    .onAfterHandle(({ set, session }) => {
+      set.headers["X-User-Id"] = session.user.id;
     })
     .as("scoped");
 
