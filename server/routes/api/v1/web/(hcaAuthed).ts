@@ -12,7 +12,7 @@ export const authGuard = () =>
     .resolve(async ({ authorized, cookie, set }) => {
       if (!(await authorized("hackclub")))
         throw new APIError({
-          status: 403,
+          status: 401,
           msg: "unauthorized",
         });
 
@@ -23,7 +23,7 @@ export const authGuard = () =>
         .where(eq(users.id, s.userId!));
       if (!currentUser || Object.keys(currentUser).length === 0)
         throw new APIError({
-          status: 403,
+          status: 401,
           msg: "user_doesnt_exist",
         });
       set.headers["X-User-Id"] = currentUser.id;
