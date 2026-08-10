@@ -11,6 +11,9 @@ function Dashboard() {
   const toast = useToast();
   const nav = useNavigate();
   const [label, setLabel] = createSignal("");
+  const [sessionReady, setReady] = createSignal<boolean>(false);
+  const [showDelModel, setDelModel] = createSignal<boolean>(false);
+  const [confirmAdele, setConfirmAdele] = createSignal<string>("");
 
   onMount(async () => {
     try {
@@ -29,6 +32,7 @@ function Dashboard() {
         retry: false,
       });
       if (!data || !data.ok) return nav("/");
+      setReady(true);
     } catch (e) {
       toast("Session check failed — please log in again.");
       nav("/");
@@ -37,6 +41,7 @@ function Dashboard() {
 
   const queryKeys = createQuery(() => ({
     queryKey: ["apiKeys"],
+    enabled: sessionReady(),
     queryFn: async () => {
       const result = await server.api.v1.web.apiKeys.get();
       if (!result.data) {
@@ -51,6 +56,7 @@ function Dashboard() {
   }));
 
   const createKey = createMutation(() => ({
+    enabled: sessionReady(),
     mutationFn: async () => {
       const result = await server.api.v1.web.apiKeys.post({
         label: label() || undefined,
@@ -78,6 +84,7 @@ function Dashboard() {
   }));
 
   const deleteKey = createMutation(() => ({
+    enabled: sessionReady(),
     mutationFn: async (id: string) => {
       const result = await server.api.v1.web.apiKeys.delete({
         id,
@@ -106,6 +113,38 @@ function Dashboard() {
     },
   }));
 
+  const logout = createMutation(() => ({
+    mutationFn: async () => {
+      const result = await server.api.v1.web.login.getOUT.get();
+      return result.data;
+    },
+    onSuccess: (data) => {
+      if (data?.url) window.location.href = data.url;
+    },
+    onError: (err) => {
+      if (isApiError(err)) {
+        toast(resolveErrorMessage(err.err.msg, "Internal server error"));
+      } else {
+        toast(err instanceof Error ? err.message : "Failed to logout of the account");
+      }
+    },
+  }));
+  const deleteAcc = createMutation(() => ({
+    mutationFn: async () => {
+      const result = await server.api.v1.web.account.delete();
+      return result.data;
+    },
+    onSuccess: (data) => {
+      if (data?.ok) window.location.href = "/";
+    },
+    onError: (err) => {
+      if (isApiError(err)) {
+        toast(resolveErrorMessage(err.err.msg, "Internal server error"));
+      } else {
+        toast(err instanceof Error ? err.message : "Failed to delete the account");
+      }
+    },
+  }));
   return (
     <div class="bg-dark h-screen text-white overflow-y-hidden">
       <nav class="border-b border-b-darkless min-h-[56px] flex items-center relative ">
@@ -126,7 +165,10 @@ function Dashboard() {
             Manage
           </A>
         </div>
-        <button class="no-underline text-white hover:text-secondary-dark ml-auto mr-3 cursor-pointer">
+        <button
+          class="no-underline text-white hover:text-secondary-dark ml-auto mr-3 cursor-pointer"
+          onClick={() => logout.mutate()}
+        >
           Logout
         </button>
       </nav>
@@ -135,7 +177,6 @@ function Dashboard() {
         <Show when={queryKeys.isLoading}>
           <p class="text-white">Loading...</p>
         </Show>
-
         <Show when={queryKeys.isError}>
           <p class="text-white">Error: {queryKeys.error?.message}</p>
         </Show>
@@ -247,7 +288,6 @@ function Dashboard() {
               }}
             />
           </div>
-
           <div class="bg-darkless p-3 flex items-center gap-3">
             <p class="text-white text-sm">
               You'll need an API key to use any public endpoint provided!
@@ -264,7 +304,54 @@ function Dashboard() {
             </button>
           </div>
         </div>
+        <button
+          class="button hc-btn-primary ml-auto mt-2 min-w-full"
+          // disabled={
+          //   createKey.isPending ||
+          //   (queryKeys.data && queryKeys.data.length >= 5)
+          // }
+          onClick={() => setDelModel(true)}
+        >
+          Delete Account?
+        </button>
       </main>
+      <Show when={showDelModel()}>
+        <div class="fixed inset-0 bg-dark/80 flex items-center justify-center z-50">
+          <div class="hc-container bg-darkless rounded p-4 w-full flex flex-col gap-3">
+            <h2 class="hc-text-heading text-2">Delete your account?</h2>
+            <p class="text-white/70 text-sm">
+              This can't be undone. Type{" "}
+              <span class="text-white">Delete it!</span> to confirm.
+            </p>
+            <input
+              class="hc-input bg-dark p-2 text-white"
+              placeholder="Delete it!"
+              value={confirmAdele()}
+              onInput={(e) => setConfirmAdele(e.currentTarget.value)}
+            />
+            <div class="flex gap-2 justify-end mt-2">
+              <button
+                class="button"
+                onClick={() => {
+                  setDelModel(false);
+                  setConfirmAdele("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                class="button hc-btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={
+                  confirmAdele() !== "Delete it!" || deleteAcc.isPending
+                }
+                onClick={() => deleteAcc.mutate()}
+              >
+                Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

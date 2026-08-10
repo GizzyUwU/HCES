@@ -13,7 +13,7 @@ export const authGuard = () =>
       if (!(await authorized("hackclub")))
         throw new APIError({
           status: 403,
-          msg: "forbidden",
+          msg: "unauthorized",
         });
 
       const s = await getOrCreateSession(cookie);
@@ -24,7 +24,7 @@ export const authGuard = () =>
       if (!currentUser || Object.keys(currentUser).length === 0)
         throw new APIError({
           status: 403,
-          msg: "forbidden",
+          msg: "user_doesnt_exist",
         });
       set.headers["X-User-Id"] = currentUser.id;
       return { session: { user: currentUser } };

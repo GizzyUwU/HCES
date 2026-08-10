@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@bogeychan/elysia-oauth2": "^0.1.0",
+    "@elysiajs/cron": "^1.4.2",
     "@elysiajs/eden": "^1.4.9",
     "@kobalte/core": "^0.13.12",
     "@logtape/elysia": "^2.3.0",
@@ -15,6 +16,7 @@
     "@logtape/sentry": "^2.3.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@sentry/bun": "^10.69.0",
+    "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^1.0.0",
     "@svgr/plugin-jsx": "^8.1.0",
     "@tailwindcss/vite": "^4.3.3",

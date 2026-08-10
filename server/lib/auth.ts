@@ -161,11 +161,7 @@ export const auth = oauth2({
     async delete({ cookie }, name) {
       const s = await getOrCreateSession(cookie);
       if (!s.userId) return;
-      await db
-        .delete(oauthToken)
-        .where(
-          and(eq(oauthToken.userId, s.userId), eq(oauthToken.provider, name)),
-        );
+      await db.delete(session).where(eq(session.id, s.id));
     },
   },
 });

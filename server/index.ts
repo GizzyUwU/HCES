@@ -6,10 +6,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { auth } from "./lib/auth";
 import { APIError, UnverifiedAccountError } from "./lib/error";
 import { session } from "./schema/users";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { elysiaLogger } from "@logtape/elysia";
 import * as Sentry from "@sentry/bun";
 import { getSentrySink } from "@logtape/sentry";
+import { cron, Patterns } from "@elysiajs/cron";
 
 if (process.env["SENTRY_DSN"]) {
   Sentry.init({
@@ -126,4 +127,17 @@ export const app = new Elysia()
   })
   .use(auth)
   .use(routes)
+  .use(cron({
+    name: "sessionCleanup",
+    pattern: Patterns.EVERY_10_MINUTES,
+    run: async () => {
+      const res = await db
+        .delete(session)
+        .where(or(lt(session.expiresAt, new Date()), and(isNull(session.userId), lt(session.createdAt, new Date(Date.now() - 15 * 60 * 1000)))))
+        .returning({ id: session.id })
+      if (res.length > 0) {
+        logger.info("Go away stinky stale sessions", { count: res.length })
+      }
+    }
+  }))
   .listen(8000, ({ url }) => console.log(`Server is running on ${url}`));

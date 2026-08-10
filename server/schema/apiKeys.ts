@@ -10,7 +10,7 @@ export const apiKeys = pgTable(
       .primaryKey(),
     userId: varchar("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     prefix: varchar("prefix").notNull(),
     keyHash: varchar("key_hash", { length: 64 }).notNull().unique(),
     label: varchar("label").default("Goog... No label set :("),

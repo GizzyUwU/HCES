@@ -15,7 +15,7 @@ export const session = pgTable("session", {
   id: varchar("id")
     .$defaultFn(() => createId())
     .primaryKey(),
-  userId: varchar("user_id").references(() => users.id),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   oauthState: varchar("oauth_state"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
@@ -29,7 +29,7 @@ export const oauthToken = pgTable(
       .primaryKey(),
     userId: varchar("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     provider: varchar("provider").notNull(),
     token: jsonb("token").$type<TOAuth2AccessToken>().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

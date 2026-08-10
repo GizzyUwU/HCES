@@ -6,6 +6,8 @@ import Dashboard from "./pages/dashboard";
 import "@/styles/index.css";
 import toast, { Toaster } from "solid-toast";
 import type { JSX } from "solid-js";
+import { Link, MetaProvider } from "@solidjs/meta";
+import logo from "@/public/favicon.webp";
 type ShowToast = (children: JSX.Element) => void;
 const ToastContext = createContext<ShowToast>();
 
@@ -40,13 +42,16 @@ export const App = () => {
   const client = new QueryClient();
   return (
     <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+      <MetaProvider>
       <QueryClientProvider client={client}>
+        <Link rel="icon" href={logo} />
         <Toaster position="top-center" />
         <Router root={RootLayout}>
           <Route path="/" component={Login} />
           <Route path="/dashboard" component={Dashboard} />
         </Router>
-      </QueryClientProvider>
+        </QueryClientProvider>
+      </MetaProvider>
     </ErrorBoundary>
   );
 };
