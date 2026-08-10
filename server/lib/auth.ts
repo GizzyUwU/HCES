@@ -158,7 +158,7 @@ export const auth = oauth2({
         await db.update(session).set({ userId }).where(eq(session.id, s.id));
       }
     },
-    async delete({ cookie }, name) {
+    async delete({ cookie }) {
       const s = await getOrCreateSession(cookie);
       if (!s.userId) return;
       await db.delete(session).where(eq(session.id, s.id));
