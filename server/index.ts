@@ -11,6 +11,9 @@ import { elysiaLogger } from "@logtape/elysia";
 import * as Sentry from "@sentry/bun";
 import { getSentrySink } from "@logtape/sentry";
 import { cron, Patterns } from "@elysiajs/cron";
+import openapi from "@elysia/openapi";
+import { getPublicOpenApiSpec } from "./lib/openapi";
+import { YAML } from "bun";
 
 if (process.env["SENTRY_DSN"]) {
   Sentry.init({
@@ -68,16 +71,16 @@ const routes = await fsr({
   logLevel: LogLevel.Default,
 });
 
-export const app = new Elysia()
+const baseApp = new Elysia()
   .use(
     elysiaLogger({
       category: ["hces"],
-      logRequest: false, 
+      logRequest: false,
       format: (ctx, responseTime) => ({
         method: ctx.request.method,
         path: ctx.path,
         status: ctx.set.status,
-        duration: responseTime
+        duration: responseTime,
       }),
       context: {
         requestId: {
@@ -88,7 +91,7 @@ export const app = new Elysia()
         enrich: async (ctx) => {
           const cookieHeader = ctx.request.headers.get("cookie") ?? "";
           const sid = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/)?.[1];
-        
+
           let userId: string | undefined;
           if (sid) {
             const [s] = await db
@@ -98,7 +101,7 @@ export const app = new Elysia()
               .limit(1);
             userId = s?.userId ?? undefined;
           }
-        
+
           return { route: ctx.path, userId };
         },
       },
@@ -127,17 +130,48 @@ export const app = new Elysia()
   })
   .use(auth)
   .use(routes)
-  .use(cron({
-    name: "sessionCleanup",
-    pattern: Patterns.EVERY_10_MINUTES,
-    run: async () => {
-      const res = await db
-        .delete(session)
-        .where(or(lt(session.expiresAt, new Date()), and(isNull(session.userId), lt(session.createdAt, new Date(Date.now() - 15 * 60 * 1000)))))
-        .returning({ id: session.id })
-      if (res.length > 0) {
-        logger.info("Go away stinky stale sessions", { count: res.length })
+  .use(
+    openapi({
+      path: "/api/v1/docs",
+      specPath: "/openapi-internal/json",
+      scalar: {
+        url: "/openapi/json",
       }
-    }
-  }))
+    }),
+  )
+  .use(
+    cron({
+      name: "sessionCleanup",
+      pattern: Patterns.EVERY_10_MINUTES,
+      run: async () => {
+        const res = await db
+          .delete(session)
+          .where(
+            or(
+              lt(session.expiresAt, new Date()),
+              and(
+                isNull(session.userId),
+                lt(session.createdAt, new Date(Date.now() - 15 * 60 * 1000)),
+              ),
+            ),
+          )
+          .returning({ id: session.id });
+        if (res.length > 0) {
+          logger.info("Go away stinky stale sessions", { count: res.length });
+        }
+      },
+    }),
+  );
+
+export const app = baseApp
+  .get("/openapi/json", () => getPublicOpenApiSpec(baseApp))
+  .get(
+    "/openapi/yaml",
+    () =>
+      new Response(YAML.stringify(getPublicOpenApiSpec(baseApp), null, 2), {
+        headers: {
+          "content-type": "application/yaml; charset=utf-8",
+        },
+      }),
+  )
   .listen(8000, ({ url }) => console.log(`Server is running on ${url}`));

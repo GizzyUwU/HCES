@@ -5,8 +5,9 @@ import { APIError } from "@server/lib/error";
 import { bearer } from "@elysia/bearer";
 import { apiKeys } from "@server/schema/apiKeys";
 import { createHash } from "crypto";
+import { errorModel } from "@server/lib/errorModel";
 
-export const authGuard = () =>
+export const keyguard = () =>
   new Elysia({ name: "keyguard" })
     .use(bearer())
     .resolve(async ({ bearer }) => {
@@ -37,6 +38,13 @@ export const authGuard = () =>
     .onAfterHandle(({ set, keyData }) => {
       set.headers["X-User-Id"] = keyData.userId;
     })
+    .use(errorModel)
+    .guard({
+      response: {
+        401: "unauthorized",
+        500: "internalError",
+      },
+    })
     .as("scoped");
 
-export default new Elysia().use(authGuard());
+export default new Elysia().use(keyguard());

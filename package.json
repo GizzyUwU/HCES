@@ -9,6 +9,7 @@
   "dependencies": {
     "@bogeychan/elysia-oauth2": "^0.1.0",
     "@elysia/bearer": "^1.4.4",
+    "@elysia/openapi": "^1.4.15",
     "@elysiajs/cron": "^1.4.2",
     "@elysiajs/eden": "^1.4.9",
     "@kobalte/core": "^0.13.12",

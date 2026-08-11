@@ -26,4 +26,8 @@ export default new Elysia()
         hcaId: user.hcaId,
       },
     };
+  }, {
+    detail: {
+        hide: true
+    } 
   });
