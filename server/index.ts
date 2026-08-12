@@ -50,6 +50,13 @@ await configure({
   },
   loggers: [
     {
+      category: ["logtape", "meta"],
+      sinks: [
+        "console",
+      ],
+      lowestLevel: "error",
+    },
+    {
       category: ["hces"],
       sinks: [
         "console",

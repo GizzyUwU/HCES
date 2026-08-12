@@ -14,23 +14,33 @@ export default new Elysia()
   .get(
     "",
     async (ctx) => {
-      const s = await getOrCreateSession(ctx.cookie);
-      if (!s.userId) throw new APIError({ status: 401, msg: "unauthorized" });
+      try {
+        const s = await getOrCreateSession(ctx.cookie);
+        if (!s.userId) throw new APIError({ status: 401, msg: "unauthorized" });
 
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, s.userId));
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, s.userId));
 
-      if (!user) throw new APIError({ status: 401, msg: "unauthorized" });
-      return {
-        ok: true,
-        user: {
-          id: user.id,
-          slackId: user.slackId,
-          hcaId: user.hcaId,
-        },
-      };
+        if (!user) throw new APIError({ status: 401, msg: "unauthorized" });
+        return {
+          ok: true,
+          user: {
+            id: user.id,
+            slackId: user.slackId,
+            hcaId: user.hcaId,
+          },
+        };
+      } catch (err) {
+        logger.error("Deletion of a user failed", {
+          error: err,
+        });
+        throw new APIError({
+          status: 500,
+          msg: "internal_server_error",
+        });
+      }
     },
     {
       response: t.Object({

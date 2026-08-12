@@ -9,21 +9,31 @@ import { createSelectSchema } from "drizzle-typebox";
 const _users = createSelectSchema(users);
 
 export default new Elysia().use(keyguard).get("", async ({ keyData }) => {
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, keyData.userId));
-  if (!user) throw new APIError({ status: 401, msg: "unauthorized" });
-  return {
-    ok: true,
-    id: keyData.id,
-    user: {
-      id: user.id,
-      slackId: user.slackId,
-    },
-    label: keyData.label,
-    createdAt: keyData.createdAt,
-  };
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, keyData.userId));
+    if (!user) throw new APIError({ status: 401, msg: "unauthorized" });
+    return {
+      ok: true,
+      id: keyData.id,
+      user: {
+        id: user.id,
+        slackId: user.slackId,
+      },
+      label: keyData.label,
+      createdAt: keyData.createdAt,
+    };
+  } catch (err) {
+    logger.error("Failed getting me data via api key", {
+      error: err
+    });
+    throw new APIError({
+      status: 500,
+      msg: "internal_server_error",
+    });
+  }
 }, {
   response:
   {
