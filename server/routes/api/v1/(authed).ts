@@ -1,5 +1,5 @@
 import Elysia from "elysia";
-import { db, logger } from "../../../index";
+import { db, logger } from "@server/index";
 import { eq } from "drizzle-orm";
 import { APIError } from "@server/lib/error";
 import { bearer } from "@elysia/bearer";

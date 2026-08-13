@@ -14,6 +14,9 @@ import { cron, Patterns } from "@elysiajs/cron";
 import openapi from "@elysia/openapi";
 import { getPublicOpenApiSpec } from "./lib/openapi";
 import { YAML } from "bun";
+import { websocketHandler } from "./lib/ws";
+import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
+import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 
 if (process.env["SENTRY_DSN"]) {
   Sentry.init({
@@ -51,9 +54,7 @@ await configure({
   loggers: [
     {
       category: ["logtape", "meta"],
-      sinks: [
-        "console",
-      ],
+      sinks: ["console"],
       lowestLevel: "error",
     },
     {
@@ -140,10 +141,10 @@ const baseApp = new Elysia()
   .use(
     openapi({
       path: "/api/v1/docs",
-      specPath: "/openapi-internal/json",
+      specPath: "/api/v1/docs/openapi-internal/json",
       scalar: {
-        url: "/openapi/json",
-      }
+        url: "/api/v1/docs/json",
+      },
     }),
   )
   .use(
@@ -170,10 +171,37 @@ const baseApp = new Elysia()
     }),
   );
 
+const routedApp = new Elysia().use(routes);
+const socket = websocketHandler(routedApp);
+const channels = [socket];
+const document = getAsyncApiDocument(channels, {
+  info: {
+    title: "HCES WS",
+    version: "v1",
+  },
+  servers: {
+    hces: {
+      host: "hces.gizzy.gay", // AsyncAPI url is host[:port][/path], no protocol prefix
+      protocol: "wss",
+      security: [{ $ref: "#/components/securitySchemes/Header" }],
+    },
+  },
+  components: {
+    securitySchemes: {
+      Header: {
+        type: "http",
+        scheme: "bearer",
+      },
+    },
+  },
+});
 export const app = baseApp
-  .get("/openapi/json", () => getPublicOpenApiSpec(baseApp))
+  .use(wsAsyncAPIAdapter(channels))
+  .get("/api/v1/ws/docs", () => getAsyncApiUI(document, "response"))
+  .get("/api/v1/ws/asyncapi.json", () => document)
+  .get("/api/v1/docs/json", () => getPublicOpenApiSpec(baseApp))
   .get(
-    "/openapi/yaml",
+    "/api/v1/docs/yaml",
     () =>
       new Response(YAML.stringify(getPublicOpenApiSpec(baseApp), null, 2), {
         headers: {

@@ -65,7 +65,7 @@ export default class Stardance {
     return normalizeItems;
   }
 
-  private async goiReviewerLb($: CheerioAPI, rows: Element[]) {
+  private async goiReviewerLb($: CheerioAPI, rows: Element[]): Promise<t.Static<(typeof SDTypes)["goiStats"]>["reviewerLb"]> {
     return rows.map((bRow) => {
       const row = $(bRow);
       const cells = row.find("td");
@@ -88,7 +88,7 @@ export default class Stardance {
     });
   }
 
-  private async goiReviewerGraph($: CheerioAPI) {
+  private async goiReviewerGraph($: CheerioAPI): Promise<t.Static<(typeof SDTypes)["goiStats"]>["graph"]> {
     const graph = $(".ysws-dashboard__chart");
     const rawGraph = graph.attr(
       "data-certification--ysws--reviewer-chart-chart-value",

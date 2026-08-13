@@ -18,7 +18,7 @@ export function getPublicOpenApiSpec(
     ],
     paths: Object.fromEntries(
       Object.entries(paths).filter(
-        ([path]) => path.startsWith("/api/v1") && !path.startsWith("/api/v1/web"),
+        ([path]) => path.startsWith("/api/v1") && !path.startsWith("/api/v1/web") && !path.startsWith("/api/v1/docs"),
       ),
     ),
     components: {

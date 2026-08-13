@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:sd": "concurrently -k -s first -n server,test -c green,blue \"bun run server/index.ts\" \"until curl -s http://localhost:8000 > /dev/null; do sleep 0.2; done; bun test sd.api.test.ts\"",
     "dev": "concurrently -n vite,server -c blue,green \"vite --host\" \"bun run --watch server/index.ts\""
   },
   "dependencies": {
@@ -18,11 +19,13 @@
     "@logtape/sentry": "^2.3.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@sentry/bun": "^10.69.0",
+    "@sinclair/typemap": "^0.10.1",
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^1.0.0",
     "@svgr/plugin-jsx": "^8.1.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/solid-query": "^5.101.4",
+    "@ws-asyncapi/adapter-elysia": "^0.1.1",
     "axios": "^1.19.0",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
@@ -44,7 +47,9 @@
     "typebox": "^1.3.12",
     "vite": "^8.2.0",
     "vite-plugin-solid": "^2.11.14",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "ws-asyncapi": "^0.1.1",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "@sinclair/typebox": "0.34.52"
