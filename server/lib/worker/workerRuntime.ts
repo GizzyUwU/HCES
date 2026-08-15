@@ -1,4 +1,4 @@
-import { workerApp } from "./workerApp";
+import { workerApp } from "../workerApp";
 import { logger } from "@server/index";
 type JobMessage = {
   type: "job";
@@ -14,12 +14,14 @@ async function handleJob(msg: JobMessage, send: (data: string) => void) {
     });
     const res = await app.handle(req);
     const data = await res.json().catch(() => null);
+    const bytes = Buffer.byteLength(JSON.stringify(data ?? null), "utf-8");
     send(
       JSON.stringify({
         type: "result",
         id: msg.id,
         status: res.status,
         data,
+        bytes
       }),
     );
   } catch (err) {
@@ -43,14 +45,19 @@ async function handleJob(msg: JobMessage, send: (data: string) => void) {
 export function startRemoteWorker({
   url,
   secret,
+  version,
 }: {
   url: string;
   secret: string;
+  version: string;
 }) {
   let reconnectDelay = 1000;
   const connect = () => {
     const socket = new WebSocket(`${url.replace(/\/$/, "")}/ws/workers`, {
-      headers: { Authorization: `Bearer ${secret}` },
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        ...(version ? { "X-Worker-Version": version } : {}),
+      },
     } as unknown as ConstructorParameters<typeof WebSocket>[1]);
     socket.addEventListener("open", () => {
       logger.info("connected to orchestrator", {
@@ -67,21 +74,21 @@ export function startRemoteWorker({
         return;
       }
       if (msg.type !== "job") return;
-      void handleJob(msg, (data) => socket.send(data))
+      void handleJob(msg, (data) => socket.send(data));
     });
 
     socket.addEventListener("close", () => {
       logger.warn("uhm i disconnected from orchestrator ill try to reconnect", {
-        in: reconnectDelay
+        in: reconnectDelay,
       });
       setTimeout(connect, reconnectDelay);
-      reconnectDelay = Math.min(reconnectDelay * 2, 30 * 1000)
-    })
+      reconnectDelay = Math.min(reconnectDelay * 2, 30 * 1000);
+    });
 
     socket.addEventListener("error", (err) => {
       logger.error("socket error", { error: err });
-    })
+    });
   };
 
-  connect()
+  connect();
 }

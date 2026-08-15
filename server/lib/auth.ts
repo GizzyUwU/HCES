@@ -68,21 +68,37 @@ async function resolveOrCreateUser(token: TOAuth2AccessToken) {
           .set({ slackId: me.identity.slack_id })
           .where(eq(users.id, existing.id));
       } catch (err) {
-        logger.error("Failed updating user's slack id to match the slack id returned by HCA", { error: err });
+        logger.error(
+          "Failed updating user's slack id to match the slack id returned by HCA",
+          { error: err },
+        );
         throw new APIError({
           status: 500,
-          msg: "internal_server_error"
-        })
+          msg: "internal_server_error",
+        });
       }
     }
     return existing.id;
   }
+
+  const [existingAdmin] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.admin, true))
+    .limit(1);
 
   const [created] = await db
     .insert(users)
     .values({
       slackId: me.identity.slack_id,
       hcaId: me.identity.id,
+      admin: Boolean(
+        process.env["ADMIN_SLACK_ID"] &&
+        me.identity.slack_id &&
+        String(process.env["ADMIN_SLACK_ID"]) ===
+          String(me.identity.slack_id) &&
+        !existingAdmin,
+      ),
     })
     .returning();
   return created!.id;

@@ -2,7 +2,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { db, logger } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
 import { and, avg, count, eq, gte, isNotNull } from "drizzle-orm";
-
+import { workers as workersSchema } from "@server/schema/workers"
 const workers = new Map<
   string,
   {
@@ -13,7 +13,7 @@ const workers = new Map<
 const pending = new Map<
   string,
   {
-    resolve: (result: { status: number; data: unknown }) => void;
+    resolve: (result: { status: number; data: unknown; bytes: number; }) => void;
     reject: (err: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
   }
@@ -41,7 +41,15 @@ export function registerWorker(id: string, send: (data: string) => void) {
 
 export function unregisterWorker(id: string) {
   workers.delete(id);
-  logger.info("Worker disconnected", {
+  db.update(workersSchema)
+    .set({
+      connected: true,
+    })
+    .where(eq(workersSchema.id, id))
+    .catch((err) =>
+      logger.error("failed to update worker with connection info", { err }),
+    );
+  logger.info("worker disconnected", {
     id,
     poolSize: workers.size,
   });
@@ -120,11 +128,13 @@ export async function recordDispatch(
 
 export async function recordCompletion(
   rowId: string,
-  durationMs: number,
+  latencyMs: number,
+  bytes: number
 ): Promise<void> {
   db.update(workerStats)
     .set({
-      latencyMs: durationMs,
+      latencyMs,
+      bytes
     })
     .where(eq(workerStats.id, rowId))
     .catch((err) => logger.error("failed to record worker latency", { err }));
@@ -134,7 +144,7 @@ export function sendToWorker(
   workerId: string,
   path: string,
   headers: Record<string, string>,
-): Promise<{ status: number; data: unknown }> {
+): Promise<{ status: number; data: unknown; bytes: number; }> {
   const worker = workers.get(workerId);
   if (!worker) return Promise.reject(new Error("worker_not_connected"));
   const id = createId();
@@ -161,20 +171,15 @@ export function sendToWorker(
 
 export function resolveJob(
   id: string,
-  _workerId: string,
-  _path: string,
   result: {
     status: number;
     data: unknown;
-    durationMs: number;
+    bytes: number;
   },
 ) {
   const job = pending.get(id);
   if (!job) return;
   clearTimeout(job.timeout);
   pending.delete(id);
-  job.resolve({
-    status: result.status,
-    data: result.data,
-  });
+  job.resolve(result);
 }

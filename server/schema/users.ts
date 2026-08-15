@@ -1,22 +1,36 @@
-import { pgTable, varchar, timestamp, jsonb, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  varchar,
+  timestamp,
+  jsonb,
+  uniqueIndex,
+  boolean,
+  index,
+} from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import type { TOAuth2AccessToken } from "@bogeychan/elysia-oauth2";
 
-export const users = pgTable("users", {
-  id: varchar("id")
-    .$defaultFn(() => createId())
-    .primaryKey(),
-  slackId: varchar("slack_id").unique(),
-  hcaId: varchar("hca_id").unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  admin: boolean("admin").default(false).notNull()
-});
+export const users = pgTable(
+  "users",
+  {
+    id: varchar("id")
+      .$defaultFn(() => createId())
+      .primaryKey(),
+    slackId: varchar("slack_id").unique(),
+    hcaId: varchar("hca_id").unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    admin: boolean("admin").default(false).notNull(),
+  },
+  (table) => [index("users_admin_idx").on(table.admin)],
+);
 
 export const session = pgTable("session", {
   id: varchar("id")
     .$defaultFn(() => createId())
     .primaryKey(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
   oauthState: varchar("oauth_state"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
