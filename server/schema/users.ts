@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, varchar, timestamp, jsonb, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import type { TOAuth2AccessToken } from "@bogeychan/elysia-oauth2";
 
@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   slackId: varchar("slack_id").unique(),
   hcaId: varchar("hca_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  admin: boolean("admin").default(false).notNull()
 });
 
 export const session = pgTable("session", {

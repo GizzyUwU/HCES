@@ -18,6 +18,8 @@ import { websocketHandler } from "./lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 
+if(process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"]) throw new Error("WORKER_KEY required with remote workers")
+
 if (process.env["SENTRY_DSN"]) {
   Sentry.init({
     dsn: process.env["SENTRY_DSN"],
@@ -71,142 +73,155 @@ await configure({
   contextLocalStorage: new AsyncLocalStorage(),
 });
 
+export let db!: ReturnType<typeof drizzle>;
+export let app: Elysia<any, any, any, any, any, any, any> | undefined;
+
 export const logger = getLogger(["hces"]);
-export const db = drizzle(process.env.DATABASE_URL!);
-const routes = await fsr({
-  dir: "./routes",
-  filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
-  logLevel: LogLevel.Default,
-});
+if (process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"]) {
+  new Elysia()
+    .get("/health", () => ({
+      ok: true, mode: "worker"
+    }))
+    .listen(process.env["PORT"] || 8000, ({ url }) => console.log(`Worker is running on ${url}`));
+} else {
+  db = drizzle(process.env.DATABASE_URL!);
+  const routes = await fsr({
+    dir: "./routes",
+    filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
+    logLevel: LogLevel.Default,
+  });
+  const baseApp = new Elysia()
+    .use(
+      elysiaLogger({
+        category: ["hces"],
+        logRequest: false,
+        format: (ctx, responseTime) => ({
+          method: ctx.request.method,
+          path: ctx.path,
+          status: ctx.set.status,
+          duration: responseTime,
+        }),
+        context: {
+          requestId: {
+            headerNames: ["x-correlation-id", "x-request-id"],
+            responseHeader: "x-request-id",
+          },
+          include: ["requestId", "method", "path"],
+          enrich: async (ctx) => {
+            const cookieHeader = ctx.request.headers.get("cookie") ?? "";
+            const sid = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/)?.[1];
 
-const baseApp = new Elysia()
-  .use(
-    elysiaLogger({
-      category: ["hces"],
-      logRequest: false,
-      format: (ctx, responseTime) => ({
-        method: ctx.request.method,
-        path: ctx.path,
-        status: ctx.set.status,
-        duration: responseTime,
+            let userId: string | undefined;
+            if (sid) {
+              const [s] = await db
+                .select({ userId: session.userId })
+                .from(session)
+                .where(eq(session.id, sid))
+                .limit(1);
+              userId = s?.userId ?? undefined;
+            }
+
+            return { route: ctx.path, userId };
+          },
+        },
       }),
-      context: {
-        requestId: {
-          headerNames: ["x-correlation-id", "x-request-id"],
-          responseHeader: "x-request-id",
-        },
-        include: ["requestId", "method", "path"],
-        enrich: async (ctx) => {
-          const cookieHeader = ctx.request.headers.get("cookie") ?? "";
-          const sid = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/)?.[1];
+    )
+    .onError(async ({ error, set, cookie }) => {
+      if (error instanceof UnverifiedAccountError) {
+        const sessionId = cookie["sid"]?.value;
 
-          let userId: string | undefined;
-          if (sid) {
-            const [s] = await db
-              .select({ userId: session.userId })
-              .from(session)
-              .where(eq(session.id, sid))
-              .limit(1);
-            userId = s?.userId ?? undefined;
-          }
-
-          return { route: ctx.path, userId };
-        },
-      },
-    }),
-  )
-  .onError(async ({ error, set, cookie }) => {
-    if (error instanceof UnverifiedAccountError) {
-      const sessionId = cookie["sid"]?.value;
-
-      if (sessionId) {
-        await db.delete(session).where(eq(session.id, sessionId));
-      }
-
-      cookie["sid"]?.remove();
-      set.status = 302;
-      set.headers.location = `${process.env.WEB_URL ?? "http://localhost:3000"}/?error=account_unverified`;
-      return;
-    } else if (error instanceof APIError) {
-      set.status = error.status;
-      return {
-        err: { status: error.status, msg: error.message },
-      };
-    } else {
-      throw error;
-    }
-  })
-  .use(auth)
-  .use(routes)
-  .use(
-    openapi({
-      path: "/api/v1/docs",
-      specPath: "/api/v1/docs/openapi-internal/json",
-      scalar: {
-        url: "/api/v1/docs/json",
-      },
-    }),
-  )
-  .use(
-    cron({
-      name: "sessionCleanup",
-      pattern: Patterns.EVERY_10_MINUTES,
-      run: async () => {
-        const res = await db
-          .delete(session)
-          .where(
-            or(
-              lt(session.expiresAt, new Date()),
-              and(
-                isNull(session.userId),
-                lt(session.createdAt, new Date(Date.now() - 15 * 60 * 1000)),
-              ),
-            ),
-          )
-          .returning({ id: session.id });
-        if (res.length > 0) {
-          logger.info("Go away stinky stale sessions", { count: res.length });
+        if (sessionId) {
+          await db.delete(session).where(eq(session.id, sessionId));
         }
-      },
-    }),
-  );
 
-const routedApp = new Elysia().use(routes);
-const socket = websocketHandler(routedApp);
-const channels = [socket];
-const document = getAsyncApiDocument(channels, {
-  info: {
-    title: "HCES WS",
-    version: "v1",
-  },
-  servers: {
-    hces: {
-      host: "hces.gizzy.gay", // AsyncAPI url is host[:port][/path], no protocol prefix
-      protocol: "wss",
-      security: [{ $ref: "#/components/securitySchemes/Header" }],
-    },
-  },
-  components: {
-    securitySchemes: {
-      Header: {
-        type: "http",
-        scheme: "bearer",
-      },
-    },
-  },
-});
-export const app = baseApp
-  .use(wsAsyncAPIAdapter(channels))
-  .get("/api/v1/ws/docs", () => getAsyncApiUI(document, "response"))
-  .get("/api/v1/ws/asyncapi.json", () => document)
-  .get("/api/v1/docs/json", () => getPublicOpenApiSpec(baseApp))
-  .get(
-    "/api/v1/docs/yaml",
-    () =>
-      new Response(YAML.stringify(getPublicOpenApiSpec(baseApp), null, 2), {
-        headers: {
-          "content-type": "application/yaml; charset=utf-8",
+        cookie["sid"]?.remove();
+        set.status = 302;
+        set.headers.location = `${process.env.WEB_URL ?? "http://localhost:3000"}/?error=account_unverified`;
+        return;
+      } else if (error instanceof APIError) {
+        set.status = error.status;
+        return {
+          err: { status: error.status, msg: error.message },
+        };
+      } else {
+        throw error;
+      }
+    })
+    .use(auth)
+    .use(routes)
+    .use(
+      openapi({
+        path: "/api/v1/docs",
+        specPath: "/api/v1/docs/openapi-internal/json",
+        scalar: {
+          url: "/api/v1/docs/json",
         },
       }),
-  )
-  .listen(8000, ({ url }) => console.log(`Server is running on ${url}`));
+    )
+    .use(
+      cron({
+        name: "sessionCleanup",
+        pattern: Patterns.EVERY_10_MINUTES,
+        run: async () => {
+          const res = await db
+            .delete(session)
+            .where(
+              or(
+                lt(session.expiresAt, new Date()),
+                and(
+                  isNull(session.userId),
+                  lt(session.createdAt, new Date(Date.now() - 15 * 60 * 1000)),
+                ),
+              ),
+            )
+            .returning({ id: session.id });
+          if (res.length > 0) {
+            logger.info("Go away stinky stale sessions", { count: res.length });
+          }
+        },
+      }),
+    );
+
+  const routedApp = new Elysia().use(routes);
+  const socket = websocketHandler(routedApp);
+  const channels = [socket];
+  const document = getAsyncApiDocument(channels, {
+    info: {
+      title: "HCES WS",
+      version: "v1",
+    },
+    servers: {
+      hces: {
+        host: "hces.gizzy.gay", // AsyncAPI url is host[:port][/path], no protocol prefix
+        protocol: "wss",
+        security: [{ $ref: "#/components/securitySchemes/Header" }],
+      },
+    },
+    components: {
+      securitySchemes: {
+        Header: {
+          type: "http",
+          scheme: "bearer",
+        },
+      },
+    },
+  });
+  app = baseApp
+    .use(wsAsyncAPIAdapter(channels))
+    .get("/api/v1/ws/docs", () => getAsyncApiUI(document, "response"))
+    .get("/api/v1/ws/asyncapi.json", () => document)
+    .get("/api/v1/docs/json", () => getPublicOpenApiSpec(baseApp))
+    .get(
+      "/api/v1/docs/yaml",
+      () =>
+        new Response(YAML.stringify(getPublicOpenApiSpec(baseApp), null, 2), {
+          headers: {
+            "content-type": "application/yaml; charset=utf-8",
+          },
+        }),
+    )
+    .get("/health", () => ({
+      ok: true, mode: "orchestrator"
+    }))
+    .listen(process.env["PORT"] || 8000, ({ url }) => console.log(`Server is running on ${url}`));
+}
