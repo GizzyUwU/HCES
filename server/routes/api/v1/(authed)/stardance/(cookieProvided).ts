@@ -8,7 +8,7 @@ export const stardanceCookie = () =>
       if (!headers["x-stardance-cookie"])
         throw new APIError({
           status: 401,
-          msg: "unauthorized",
+          msg: "stardance_cookie_required",
         });
       let cookie = headers["x-stardance-cookie"];
       if (!cookie.startsWith("_stardance_session_4="))

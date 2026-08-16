@@ -2,7 +2,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { db, logger } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
 import { and, avg, count, eq, gte, isNotNull } from "drizzle-orm";
-import { workers as workersSchema } from "@server/schema/workers"
+import { workers as workersSchema } from "@server/schema/workers";
 const workers = new Map<
   string,
   {
@@ -13,7 +13,12 @@ const workers = new Map<
 const pending = new Map<
   string,
   {
-    resolve: (result: { status: number; data: unknown; bytes: number; }) => void;
+    resolve: (result: {
+      status: number;
+      data: unknown;
+      bytes: number;
+      headers?: Record<string, string>;
+    }) => void;
     reject: (err: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
   }
@@ -43,7 +48,7 @@ export function unregisterWorker(id: string) {
   workers.delete(id);
   db.update(workersSchema)
     .set({
-      connected: true,
+      connected: false,
     })
     .where(eq(workersSchema.id, id))
     .catch((err) =>
@@ -129,12 +134,12 @@ export async function recordDispatch(
 export async function recordCompletion(
   rowId: string,
   latencyMs: number,
-  bytes: number
+  bytes: number,
 ): Promise<void> {
   db.update(workerStats)
     .set({
       latencyMs,
-      bytes
+      bytes,
     })
     .where(eq(workerStats.id, rowId))
     .catch((err) => logger.error("failed to record worker latency", { err }));
@@ -144,7 +149,7 @@ export function sendToWorker(
   workerId: string,
   path: string,
   headers: Record<string, string>,
-): Promise<{ status: number; data: unknown; bytes: number; }> {
+): Promise<{ status: number; data: unknown; bytes: number; headers?: Record<string, string>  }> {
   const worker = workers.get(workerId);
   if (!worker) return Promise.reject(new Error("worker_not_connected"));
   const id = createId();
@@ -163,7 +168,10 @@ export function sendToWorker(
         type: "job",
         id,
         path,
-        headers,
+        headers: {
+          ...headers,
+          "x-hces-worker-internal": "1",
+        },
       }),
     );
   });
@@ -175,6 +183,7 @@ export function resolveJob(
     status: number;
     data: unknown;
     bytes: number;
+    headers?: Record<string, string>;
   },
 ) {
   const job = pending.get(id);

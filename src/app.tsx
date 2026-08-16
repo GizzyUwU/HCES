@@ -1,6 +1,11 @@
 import { Route, Router } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import { createContext, ErrorBoundary, useContext, type ParentComponent } from "solid-js";
+import {
+  createContext,
+  ErrorBoundary,
+  useContext,
+  type ParentComponent,
+} from "solid-js";
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
 import "@/styles/index.css";
@@ -8,6 +13,10 @@ import toast, { Toaster } from "solid-toast";
 import type { JSX } from "solid-js";
 import { Link, MetaProvider } from "@solidjs/meta";
 import logo from "@/public/favicon.webp";
+import AuthGuard from "./authGuard";
+import AdminGuard from "./adminGuard";
+import Admin from "./pages/admin/admin";
+import Workers from "./pages/admin/workers";
 type ShowToast = (children: JSX.Element) => void;
 const ToastContext = createContext<ShowToast>();
 
@@ -37,19 +46,24 @@ const RootLayout: ParentComponent = (props) => (
   </ToastContext.Provider>
 );
 
-
 export const App = () => {
   const client = new QueryClient();
   return (
     <ErrorBoundary fallback={<div>Something went wrong!</div>}>
       <MetaProvider>
-      <QueryClientProvider client={client}>
-        <Link rel="icon" href={logo} />
-        <Toaster position="top-center" />
-        <Router root={RootLayout}>
-          <Route path="/" component={Login} />
-          <Route path="/dashboard" component={Dashboard} />
-        </Router>
+        <QueryClientProvider client={client}>
+          <Link rel="icon" href={logo} />
+          <Toaster position="top-center" />
+          <Router root={RootLayout}>
+            <Route path="/" component={Login} />
+            <Route component={AuthGuard}>
+              <Route path="/dashboard" component={Dashboard} />
+              <Route component={AdminGuard}>
+                <Route path="/admin" component={Admin} />
+                <Route path="/admin/workers" component={Workers} />
+              </Route>
+            </Route>
+          </Router>
         </QueryClientProvider>
       </MetaProvider>
     </ErrorBoundary>

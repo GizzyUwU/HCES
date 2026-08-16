@@ -26,7 +26,6 @@ export const keyguard = () =>
           status: 401,
           msg: "unauthorized",
         });
-
       db.update(apiKeys)
         .set({ lastUsed: new Date() })
         .where(eq(apiKeys.id, keyData.id))

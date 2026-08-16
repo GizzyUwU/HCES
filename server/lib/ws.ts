@@ -113,7 +113,10 @@ export function websocketHandler(app: Elysia) {
         const key = ws.id + ":" + message.id;
         const run = async () => {
           const req = new Request("http://internal" + message.path, {
-            headers: message.headers,
+            headers: {
+              ...(message.headers ?? {}),
+              "x-hces-worker-internal": "1",
+            },
           });
           const res = await app.handle(req);
           const data = await res.json().catch(() => null);

@@ -20,8 +20,9 @@ export const users = pgTable(
     hcaId: varchar("hca_id").unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     admin: boolean("admin").default(false).notNull(),
+    banned: boolean("banned").default(false).notNull(),
   },
-  (table) => [index("users_admin_idx").on(table.admin)],
+  (table) => [index("users_admin_idx").on(table.admin), index("users_banned_idx").on(table.banned)],
 );
 
 export const session = pgTable("session", {

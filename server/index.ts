@@ -3,7 +3,6 @@ import fsr, { LogLevel } from "elysia-fsr";
 import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { auth } from "./lib/auth";
 import { APIError, UnverifiedAccountError } from "./lib/error";
 import { session } from "./schema/users";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
@@ -17,8 +16,15 @@ import { YAML } from "bun";
 import { websocketHandler } from "./lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
-
-if(process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"]) throw new Error("WORKER_KEY required with remote workers")
+import { startRemoteWorker } from "./lib/worker/workerRuntime";
+import { enableLocalWorker } from "./lib/worker/workerPool";
+import { workerChannel } from "./lib/worker/workerChannel";
+if (
+  process.env["WORKER"] &&
+  process.env["ORCHESTRATOR_URL"] &&
+  !process.env["WORKER_KEY"]
+)
+  throw new Error("WORKER_KEY required with remote workers");
 
 if (process.env["SENTRY_DSN"]) {
   Sentry.init({
@@ -77,13 +83,23 @@ export let db!: ReturnType<typeof drizzle>;
 export let app: Elysia<any, any, any, any, any, any, any> | undefined;
 
 export const logger = getLogger(["hces"]);
-if (process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"]) {
+if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
+  startRemoteWorker({
+    url: process.env["ORCHESTRATOR_URL"]!,
+    secret: process.env["WORKER_KEY"]!,
+    version: process.env["GIT_COMMIT_SHA"] || "1" !,
+  });
+ 
   new Elysia()
     .get("/health", () => ({
-      ok: true, mode: "worker"
+      ok: true,
+      mode: "worker",
     }))
-    .listen(process.env["PORT"] || 8000, ({ url }) => console.log(`Worker is running on ${url}`));
+    .listen(process.env["PORT"] || 8000, ({ url }) =>
+      console.log(`Worker is running on ${url}`),
+    );
 } else {
+   const { auth } = await import("./lib/auth");
   db = drizzle(process.env.DATABASE_URL!);
   const routes = await fsr({
     dir: "./routes",
@@ -149,6 +165,7 @@ if (process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"]) {
     })
     .use(auth)
     .use(routes)
+     .use(workerChannel)
     .use(
       openapi({
         path: "/api/v1/docs",
@@ -221,7 +238,12 @@ if (process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"]) {
         }),
     )
     .get("/health", () => ({
-      ok: true, mode: "orchestrator"
+      ok: true,
+      mode: "orchestrator",
     }))
-    .listen(process.env["PORT"] || 8000, ({ url }) => console.log(`Server is running on ${url}`));
+    .listen(process.env["PORT"] || 8000, ({ url }) =>
+      console.log(`Server is running on ${url}`),
+    );
+
+  if(process.env["WORKER"]) enableLocalWorker();
 }

@@ -7,6 +7,33 @@ import { APIError } from "../error";
 import bearer from "@elysia/bearer";
 import { eq } from "drizzle-orm";
 
+const lastCheese = new Map<string, number>();
+const iWantToTimers = new Map<string, ReturnType<typeof setInterval>>();
+const sockets = new Map<string, { close: () => void }>();
+
+function markDead(id: string) {
+  const timer = iWantToTimers.get(id);
+  if (timer) clearInterval(timer);
+  iWantToTimers.delete(id);
+  lastCheese.delete(id);
+  unregisterWorker(id);
+  const socket = sockets.get(id);
+  sockets.delete(id);
+  try {
+    socket?.close();
+  } catch {}
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, ts] of lastCheese) {
+    if (now - ts > 45 * 1000) {
+      logger.warn("worker missed the i want to's so killin it", { id });
+      markDead(id);
+    }
+  }
+}, 15 * 1000);
+
 export const workerChannel = new Elysia({
   name: "workerChannel",
 })
@@ -34,6 +61,16 @@ export const workerChannel = new Elysia({
     open(ws) {
       const { id, label } = ws.data.worker;
       registerWorker(id, (data) => ws.send(data));
+      sockets.set(id, ws);
+
+      lastCheese.set(id, Date.now());
+      iWantToTimers.set(
+        id,
+        setInterval(
+          () => ws.send(JSON.stringify({ type: "i_want_to" })),
+          15 * 1000,
+        ),
+      );
       db.update(workers)
         .set({
           lastConnectedAt: new Date(),
@@ -51,25 +88,34 @@ export const workerChannel = new Elysia({
       });
     },
 
-    message(_, message) {
+    message(ws, message) {
       let msg: {
         type: string;
         id: string;
         status: number;
         data: unknown;
         bytes: number;
+        headers?: Record<string, string>;
       };
       try {
-        msg = typeof message === "string" ? JSON.parse(message) : (message as typeof msg);
+        msg =
+          typeof message === "string"
+            ? JSON.parse(message)
+            : (message as typeof msg);
       } catch {
+        return;
+      }
+      if (msg.type === "_cheese") {
+        lastCheese.set(ws.data.worker.id, Date.now());
         return;
       }
       if (msg.type !== "result") return;
       resolveJob(msg.id, {
         status: msg.status,
         data: msg.data,
-        bytes: msg.bytes
-      })
+        bytes: msg.bytes,
+         headers: msg.headers,
+      });
     },
     close(ws) {
       unregisterWorker(ws.data.worker.id);

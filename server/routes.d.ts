@@ -17,6 +17,7 @@ import Route8 from "./routes/api/v1/web/login/sessionCheck.ts";
 import Route9 from "./routes/api/v1/web/login/getOUT.ts";
 import Route10 from "./routes/api/v1/web/(hcaAuthed)/apiKeys.ts";
 import Route11 from "./routes/api/v1/web/(hcaAuthed)/account.ts";
+import Route12 from "./routes/api/v1/web/(hcaAuthed)/workers.ts";
 
 export type App = Elysia<
   string,
@@ -35,6 +36,7 @@ export type App = Elysia<
         web: (typeof Route6)["~Routes"] & {
           apiKeys: (typeof Route10)["~Routes"];
           account: (typeof Route11)["~Routes"];
+          workers: (typeof Route12)["~Routes"];
         } & {
           login: {
             getRedirectUrl: (typeof Route7)["~Routes"];

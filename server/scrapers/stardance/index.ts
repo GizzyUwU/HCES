@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance } from "axios";
+import axios, { isAxiosError, type AxiosInstance } from "axios";
 import { logger as LogType } from "@server/index.ts";
 import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
@@ -11,6 +11,7 @@ export default class Stardance {
   private ready: Promise<void>;
   private logger: typeof LogType;
   private keySet: boolean = false;
+  public updatedCookie: string | undefined;
 
   constructor({ logger, cookie }: { logger: typeof LogType; cookie?: string }) {
     this.logger = logger;
@@ -20,6 +21,19 @@ export default class Stardance {
     });
     if (cookie) this.keySet = true;
     this.ready = Promise.resolve();
+
+    this.fetch.interceptors.response.use((res) => {
+      const setCookie = res.headers["set-cookie"];
+      if (!setCookie) return res;
+ 
+      for (const raw of setCookie) {
+        const match = raw.match(/^_stardance_session_4=([^;]+)/);
+        if (match) {
+          this.updatedCookie = `_stardance_session_4=${match[1]}`;
+        }
+      }
+      return res;
+    });
   }
 
   async shop(
@@ -218,47 +232,51 @@ export default class Stardance {
   > {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
-    const res = await this.fetch.request({
-      method: "GET",
-      url: "/admin/certification/review/dashboard",
-    });
-    this.lastCode = res.status;
-    if (!(
-      typeof res.data === "string" &&
-      (
-        String(res.headers["content-type"]) ??
-        String(res.headers["Content-Type"]) ??
-        ""
-      ).includes("text/html")
-    )) {
-      this.logger.warn("GOI Stats endpoint didn't return HTML", {
-        contentType: String(res.headers["Content-Type"]) ?? "",
-        status: res.status,
+    try {
+      const res = await this.fetch.request({
+        method: "GET",
+        url: "/admin/certification/review/dashboard",
       });
+      this.lastCode = res.status;
+      if (!(
+        typeof res.data === "string" &&
+        (
+          String(res.headers["content-type"]) ??
+          String(res.headers["Content-Type"]) ??
+          ""
+        ).includes("text/html")
+      )) {
+        this.logger.warn("GOI Stats endpoint didn't return HTML", {
+          contentType: String(res.headers["Content-Type"]) ?? "",
+          status: res.status,
+        });
+        return null;
+      }
+      const $ = load(res.data);
+      const lbRows = $(".ysws-dashboard__table tbody tr").toArray();
+      const reviewerLb = await this.goiReviewerLb($, lbRows);
+      const graph = await this.goiReviewerGraph($);
+      const hero = $(".ysws-dashboard__progress-hero");
+      const devlogsPerDayThisWeek = Number(
+        hero.find(".ysws-dashboard__progress-count").text(),
+      );
+      const goalMatch = hero
+        .find(".ysws-dashboard__progress-note")
+        .text()
+        .trim()
+        .match(/\d+/);
+      const personalStats = await this.goiPersonalStats($);
+      const myUsername = $(".sidebar__user-meta-handle").text().replace(/\s+/g, " ").trim().replace(/^@/, "");
+      return {
+        myUsername,
+        reviewerLb,
+        graph,
+        devlogsPerDayThisWeek,
+        numberNeededToTodaysGoal: goalMatch ? Number(goalMatch[0]) : null,
+        personalStats
+      };
+    } catch (err: any) {
       return null;
     }
-    const $ = load(res.data);
-    const lbRows = $(".ysws-dashboard__table tbody tr").toArray();
-    const reviewerLb = await this.goiReviewerLb($, lbRows);
-    const graph = await this.goiReviewerGraph($);
-    const hero = $(".ysws-dashboard__progress-hero");
-    const devlogsPerDayThisWeek = Number(
-      hero.find(".ysws-dashboard__progress-count").text(),
-    );
-    const goalMatch = hero
-      .find(".ysws-dashboard__progress-note")
-      .text()
-      .trim()
-      .match(/\d+/);
-    const personalStats = await this.goiPersonalStats($);
-    const myUsername = $(".sidebar__user-meta-handle").text().replace(/\s+/g, " ").trim().replace(/^@/, "");
-    return {
-      myUsername,
-      reviewerLb,
-      graph,
-      devlogsPerDayThisWeek,
-      numberNeededToTodaysGoal: goalMatch ? Number(goalMatch[0]) : null,
-      personalStats
-    };
   }
 }
