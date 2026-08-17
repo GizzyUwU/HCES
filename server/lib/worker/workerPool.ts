@@ -3,6 +3,12 @@ import { db, logger } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
 import { and, avg, count, eq, gte, isNotNull } from "drizzle-orm";
 import { workers as workersSchema } from "@server/schema/workers";
+import { createHash } from "node:crypto";
+import {
+  handleJob,
+  type HandleJobResult,
+  type JobMessage,
+} from "./workerRuntime";
 const workers = new Map<
   string,
   {
@@ -24,15 +30,54 @@ const pending = new Map<
   }
 >();
 
-let localWorker = false;
-export function enableLocalWorker() {
-  localWorker = true;
+let localWorker = "";
+export async function enableLocalWorker(key: string, versionSHA: string) {
+  const hash = createHash("sha256").update(key).digest("hex");
+  const local = await db
+    .update(workersSchema)
+    .set({
+      connected: true,
+      versionSHA,
+    })
+    .where(eq(workersSchema.keyHash, hash))
+    .returning({ id: workersSchema.id })
+    .catch((err) => {
+      logger.error("failed to update local worker with connection info", {
+        err,
+      });
+      return [] as { id: string }[];
+    });
+  if (!local[0]) {
+    logger.warn("Failed finding local worker's key id so disabling it");
+    return;
+  }
+  localWorker = local[0].id;
   logger.info("Local worker enabled");
+
+  registerWorker(localWorker, (data) => {
+    const msg = JSON.parse(data) as JobMessage;
+    if (msg.type !== "job") return;
+    void handleJob(msg, (data) => {
+      const result = JSON.parse(data) as HandleJobResult;
+      resolveJob(result.id, {
+        status: result.status,
+        data: result.data,
+        bytes: result.bytes ?? 0,
+        headers: result.headers,
+      });
+    });
+  });
+}
+
+export function isLocalWorker(id: string): boolean {
+  return localWorker.length > 0 && id === localWorker;
 }
 
 function candidateIds(): string[] {
   const ids = Array.from(workers.keys());
-  if (localWorker) ids.push("local");
+  if (localWorker.length > 0) {
+    ids.push(localWorker);
+  }
   return ids;
 }
 
@@ -145,11 +190,29 @@ export async function recordCompletion(
     .catch((err) => logger.error("failed to record worker latency", { err }));
 }
 
+export async function resetStaleConnections(): Promise<void> {
+  const rows = await db
+    .update(workersSchema)
+    .set({ connected: false })
+    .where(eq(workersSchema.connected, true))
+    .returning({ id: workersSchema.id });
+  if (rows.length > 0) {
+    logger.info("Wiped out stale worker connections", {
+      count: rows.length,
+    });
+  }
+}
+
 export function sendToWorker(
   workerId: string,
   path: string,
   headers: Record<string, string>,
-): Promise<{ status: number; data: unknown; bytes: number; headers?: Record<string, string>  }> {
+): Promise<{
+  status: number;
+  data: unknown;
+  bytes: number;
+  headers?: Record<string, string>;
+}> {
   const worker = workers.get(workerId);
   if (!worker) return Promise.reject(new Error("worker_not_connected"));
   const id = createId();

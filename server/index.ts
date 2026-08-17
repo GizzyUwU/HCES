@@ -17,14 +17,10 @@ import { websocketHandler } from "./lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 import { startRemoteWorker } from "./lib/worker/workerRuntime";
-import { enableLocalWorker } from "./lib/worker/workerPool";
+import { enableLocalWorker, resetStaleConnections } from "./lib/worker/workerPool";
 import { workerChannel } from "./lib/worker/workerChannel";
-if (
-  process.env["WORKER"] &&
-  process.env["ORCHESTRATOR_URL"] &&
-  !process.env["WORKER_KEY"]
-)
-  throw new Error("WORKER_KEY required with remote workers");
+if (process.env["WORKER"] && !process.env["WORKER_KEY"])
+  throw new Error("WORKER_KEY required to be a worker");
 
 if (process.env["SENTRY_DSN"]) {
   Sentry.init({
@@ -87,9 +83,9 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
   startRemoteWorker({
     url: process.env["ORCHESTRATOR_URL"]!,
     secret: process.env["WORKER_KEY"]!,
-    version: process.env["GIT_COMMIT_SHA"] || "1" !,
+    version: process.env["GIT_COMMIT_SHA"] || "1"!,
   });
- 
+
   new Elysia()
     .get("/health", () => ({
       ok: true,
@@ -99,8 +95,10 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       console.log(`Worker is running on ${url}`),
     );
 } else {
-   const { auth } = await import("./lib/auth");
+  const { auth } = await import("./lib/auth");
   db = drizzle(process.env.DATABASE_URL!);
+  await resetStaleConnections();
+
   const routes = await fsr({
     dir: "./routes",
     filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
@@ -165,7 +163,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     })
     .use(auth)
     .use(routes)
-     .use(workerChannel)
+    .use(workerChannel)
     .use(
       openapi({
         path: "/api/v1/docs",
@@ -245,5 +243,9 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       console.log(`Server is running on ${url}`),
     );
 
-  if(process.env["WORKER"]) enableLocalWorker();
+  if (process.env["WORKER"])
+    enableLocalWorker(
+      process.env["WORKER_KEY"]!,
+      process.env["GIT_COMMIT_SHA"] || "1"!,
+    );
 }

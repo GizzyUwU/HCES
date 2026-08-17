@@ -1,12 +1,22 @@
 import { workerApp } from "../workerApp";
 import { logger } from "@server/index";
-type JobMessage = {
+export type JobMessage = {
   type: "job";
   id: string;
   path: string;
   headers?: Record<string, string>;
 };
-async function handleJob(msg: JobMessage, send: (data: string) => void) {
+
+export type HandleJobResult = {
+  type: "result";
+  id: string;
+  status: number;
+  data: unknown;
+  bytes: number;
+  headers: Record<string, string>;
+}
+
+export async function handleJob(msg: JobMessage, send: (data: string) => void) {
   try {
     const app = await workerApp();
     const scopedPath = msg.path.startsWith("/api/v1")
@@ -19,7 +29,7 @@ async function handleJob(msg: JobMessage, send: (data: string) => void) {
       },
     });
     const res = await app.handle(req);
-    const data = await res.json().catch(() => null);
+    const data = await res.json().catch(() => null) as HandleJobResult;
     const bytes = Buffer.byteLength(JSON.stringify(data ?? null), "utf-8");
     const responseHeaders: Record<string, string> = {};
     res.headers.forEach((value, key) => {

@@ -1,6 +1,7 @@
 import Elysia from "elysia";
 import { errorModel } from "@server/lib/errorModel";
 import {
+    isLocalWorker,
   pickWorker,
   recordCompletion,
   recordDispatch,
@@ -37,7 +38,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         return jsonResponse(503, { err: { status: 503, msg: "no_workers_available" } });
       const rowId = await recordDispatch(workerId, path);
       const startedAt = performance.now();
-      if (workerId === "local") {
+      if (isLocalWorker(workerId)) {
         localDispatches.set(request, {
           rowId, startedAt
         })
