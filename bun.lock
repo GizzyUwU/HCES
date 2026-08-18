@@ -14,6 +14,7 @@
         "@logtape/elysia": "^2.3.0",
         "@logtape/logtape": "^2.3.0",
         "@logtape/sentry": "^2.3.0",
+        "@openpanel/sdk": "^1.3.1",
         "@paralleldrive/cuid2": "^3.3.0",
         "@sentry/bun": "^10.69.0",
         "@sinclair/typemap": "^0.10.1",
@@ -212,6 +213,8 @@
     "@logtape/sentry": ["@logtape/sentry@2.3.0", "", { "peerDependencies": { "@logtape/logtape": "^2.3.0", "@sentry/core": ">=8.0.0" } }, "sha512-THBEtR1Y/9d9JQPS2C7SYsqZUz3kmhMfXMCPO3E71b5QsAIqINskYNmnG+8lnBTUangH+NMO/37/96MuRFcR4g=="],
 
     "@noble/hashes": ["@noble/hashes@2.2.0", "", {}, "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg=="],
+
+    "@openpanel/sdk": ["@openpanel/sdk@1.3.1", "", {}, "sha512-mQ5xaBUGXnyRg3qYxwnbVaUYyW7w8u+munrWk/ClnqxEeR2j+FYPiA6noHbHMCFC2aZutYD5OoRzEvw3FBNFxw=="],
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.1", "", {}, "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="],
 

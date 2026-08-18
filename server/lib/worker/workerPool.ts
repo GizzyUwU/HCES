@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
-import { db, logger } from "@server/index";
+import { db, logger, opClient } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
 import { and, avg, count, eq, gte, isNotNull } from "drizzle-orm";
 import { workers as workersSchema } from "@server/schema/workers";
@@ -83,10 +83,13 @@ function candidateIds(): string[] {
 
 export function registerWorker(id: string, send: (data: string) => void) {
   workers.set(id, { id, send });
-  logger.info("Worker connected", {
-    id,
-    poolSize: workers.size,
-  });
+  if (id !== localWorker) {
+    logger.info("Worker connected", {
+      id,
+      poolSize: workers.size,
+    });
+  }
+  return;
 }
 
 export function unregisterWorker(id: string) {
@@ -105,6 +108,11 @@ export function unregisterWorker(id: string) {
   });
 }
 
+function scraperNameFromPath(path: string): string {
+  const paths = path.split("/").filter(Boolean);
+  return paths[2] ?? path;
+}
+
 export async function pickWorker(path: string): Promise<string | null> {
   const candidates = candidateIds();
   if (candidates.length === 0) return null;
@@ -121,7 +129,7 @@ export async function pickWorker(path: string): Promise<string | null> {
       .from(workerStats)
       .where(
         and(
-          eq(workerStats.path, path),
+          eq(workerStats.scraper, scraperNameFromPath(path)),
           gte(workerStats.lastHit, rateWindowStart),
         ),
       )
@@ -134,7 +142,7 @@ export async function pickWorker(path: string): Promise<string | null> {
       .from(workerStats)
       .where(
         and(
-          eq(workerStats.path, path),
+          eq(workerStats.scraper, scraperNameFromPath(path)),
           gte(workerStats.lastHit, latencyWindowStart),
           isNotNull(workerStats.latencyMs),
         ),
@@ -169,7 +177,7 @@ export async function recordDispatch(
     .insert(workerStats)
     .values({
       workerId: workerId,
-      path,
+      scraper: scraperNameFromPath(path),
     })
     .returning({ id: workerStats.id });
   if (!logged) throw new Error("failed_to_log_request");
@@ -181,13 +189,32 @@ export async function recordCompletion(
   latencyMs: number,
   bytes: number,
 ): Promise<void> {
-  db.update(workerStats)
+  const [row] = await db
+    .update(workerStats)
     .set({
       latencyMs,
       bytes,
     })
+    .returning({ workerId: workerStats.workerId, scraper: workerStats.scraper })
     .where(eq(workerStats.id, rowId))
-    .catch((err) => logger.error("failed to record worker latency", { err }));
+    .catch((err) => {
+      logger.error("failed to record worker latency", { err });
+      return [] as { workerId: string; scraper: string }[];
+    });
+
+  if (!row || Object.keys(row).length === 0 || !opClient) return;
+  opClient.identify({
+    profileId: row?.workerId,
+    properties: {
+      bytes,
+      scraper: row?.scraper,
+      latencyMs,
+      dev: process.env["DEV"] ?? false
+    },
+  });
+
+  await opClient.track("workers");
+  opClient.clear();
 }
 
 export async function resetStaleConnections(): Promise<void> {

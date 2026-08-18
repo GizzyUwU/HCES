@@ -17,8 +17,12 @@ import { websocketHandler } from "./lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 import { startRemoteWorker } from "./lib/worker/workerRuntime";
-import { enableLocalWorker, resetStaleConnections } from "./lib/worker/workerPool";
+import {
+  enableLocalWorker,
+  resetStaleConnections,
+} from "./lib/worker/workerPool";
 import { workerChannel } from "./lib/worker/workerChannel";
+import { OpenPanel } from "@openpanel/sdk";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -79,6 +83,28 @@ export let db!: ReturnType<typeof drizzle>;
 export let app: Elysia<any, any, any, any, any, any, any> | undefined;
 
 export const logger = getLogger(["hces"]);
+
+export let opClient: OpenPanel | undefined = undefined;
+if (
+  (!process.env["WORKER"] ||
+    (process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"])) &&
+  process.env["OP_CLIENT_ID"] &&
+  process.env["OP_CLIENT_SECRET"] &&
+  process.env["OP_SERVER_URL"]
+) {
+  opClient = new OpenPanel({
+    apiUrl: process.env["OP_SERVER_URL"],
+    clientId: process.env["OP_CLIENT_ID"],
+    clientSecret: process.env["OP_CLIENT_SECRET"],
+  });
+  logger.info("OpenPanel logs are active");
+} else if (
+  !process.env["WORKER"] ||
+  (process.env["WORKER"] && !process.env["ORCHESTRATOR_URL"])
+) {
+  logger.info("OpenPanel envs isnt set so it's not active");
+}
+
 if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
   startRemoteWorker({
     url: process.env["ORCHESTRATOR_URL"]!,
@@ -109,11 +135,12 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       elysiaLogger({
         category: ["hces"],
         logRequest: false,
+        skip: () => true,
         format: (ctx, responseTime) => ({
           method: ctx.request.method,
-          path: ctx.path,
+          path: new URL(ctx.request.url),
           status: ctx.set.status,
-          duration: responseTime,
+          responseTime,
         }),
         context: {
           requestId: {

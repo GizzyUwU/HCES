@@ -17,6 +17,7 @@ import AuthGuard from "./authGuard";
 import AdminGuard from "./adminGuard";
 import Admin from "./pages/admin/admin";
 import Workers from "./pages/admin/workers";
+import NotFound from "./pages/NotFound";
 type ShowToast = (children: JSX.Element) => void;
 const ToastContext = createContext<ShowToast>();
 
@@ -56,6 +57,7 @@ export const App = () => {
           <Toaster position="top-center" />
           <Router root={RootLayout}>
             <Route path="/" component={Login} />
+            <Route path="*404" component={NotFound} />
             <Route component={AuthGuard}>
               <Route path="/dashboard" component={Dashboard} />
               <Route component={AdminGuard}>

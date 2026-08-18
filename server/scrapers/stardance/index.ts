@@ -25,7 +25,7 @@ export default class Stardance {
     this.fetch.interceptors.response.use((res) => {
       const setCookie = res.headers["set-cookie"];
       if (!setCookie) return res;
- 
+
       for (const raw of setCookie) {
         const match = raw.match(/^_stardance_session_4=([^;]+)/);
         if (match) {
@@ -79,7 +79,10 @@ export default class Stardance {
     return normalizeItems;
   }
 
-  private async goiReviewerLb($: CheerioAPI, rows: Element[]): Promise<t.Static<(typeof SDTypes)["goiStats"]>["reviewerLb"]> {
+  private async goiReviewerLb(
+    $: CheerioAPI,
+    rows: Element[],
+  ): Promise<t.Static<(typeof SDTypes)["goiStats"]>["reviewerLb"]> {
     return rows.map((bRow) => {
       const row = $(bRow);
       const cells = row.find("td");
@@ -102,7 +105,9 @@ export default class Stardance {
     });
   }
 
-  private async goiReviewerGraph($: CheerioAPI): Promise<t.Static<(typeof SDTypes)["goiStats"]>["graph"]> {
+  private async goiReviewerGraph(
+    $: CheerioAPI,
+  ): Promise<t.Static<(typeof SDTypes)["goiStats"]>["graph"]> {
     const graph = $(".ysws-dashboard__chart");
     const rawGraph = graph.attr(
       "data-certification--ysws--reviewer-chart-chart-value",
@@ -166,37 +171,37 @@ export default class Stardance {
       rank: 0,
       totalPpl: 0,
     };
+    const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
 
     for (const bStat of stats) {
       const stat = $(bStat);
       const label = stat.find(".ysws-dashboard__progress-stat-label").text();
       const value = stat.find(".ysws-dashboard__progress-stat-value").text();
       const note = stat.find(".ysws-dashboard__progress-stat-note").text();
-
       switch (label) {
         case "Hours certified":
-          certifiedHours = Number(value);
+          certifiedHours = parseNum(value);
           break;
         case "People's projects you've reviewed":
-          diffPplProjectsReviewed.rank = Number(value);
+          diffPplProjectsReviewed.rank = parseNum(value);
           diffPplProjectsReviewed.totalPpl = Number(
-            note.match(/\d+/)?.[0] ?? 0,
+            note.replace(/,/g, "").match(/\d+/)?.[0] ?? 0,
           );
           break;
         case "Day streak":
-          streak = Number(value);
+          streak = parseNum(value);
           break;
         case "Best day": {
-          bestDay.devlogCount = Number(value);
+          bestDay.devlogCount = parseNum(value);
           const date = note.match(/set (\S+)/);
           bestDay.date = String(date ? date[1] : "");
           break;
         }
         case "Share this week":
-          shareThisWeek = Number(value.replace(/%/g, ""));
+          shareThisWeek = parseNum(value.replace(/%/g, ""));
           break;
         case "Rank this week":
-          rankThisWeek = Number(value.replace(/^#/, ""));
+          rankThisWeek = parseNum(value.replace(/^#/, ""));
           break;
         default:
           break;
@@ -204,16 +209,16 @@ export default class Stardance {
     }
 
     const tierNote = $(".ysws-dashboard__progress-tier-note").text();
-    const allTimeDevlogs = Number(
+    const allTimeDevlogs = parseNum(
       $(".ysws-dashboard__progress-tier-note strong").text(),
     );
     const devlogsTillMorePayMatch = tierNote.match(/(\d+)\s+mores?/);
     const devlogsTillMorePay = devlogsTillMorePayMatch
-      ? Number(devlogsTillMorePayMatch[1])
+      ? parseNum(String(devlogsTillMorePayMatch[1]))
       : null;
 
     const currentPayMatch = tierNote.match(/up from ([\d.]+)/);
-    const currentPay = currentPayMatch ? Number(currentPayMatch[1]) : 0;
+    const currentPay = currentPayMatch ? parseNum(String(currentPayMatch[1])) : 0;
     return {
       certifiedHours,
       diffPplProjectsReviewed,
@@ -227,9 +232,7 @@ export default class Stardance {
     };
   }
 
-  async goiStats(): Promise<
-    t.Static<(typeof SDTypes)["goiStats"]> | null
-  > {
+  async goiStats(): Promise<t.Static<(typeof SDTypes)["goiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
     try {
@@ -266,14 +269,19 @@ export default class Stardance {
         .trim()
         .match(/\d+/);
       const personalStats = await this.goiPersonalStats($);
-      const myUsername = $(".sidebar__user-meta-handle").text().replace(/\s+/g, " ").trim().replace(/^@/, "");
+      const myUsername = $(".sidebar__user-meta-handle")
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^@/, "");
+
       return {
         myUsername,
         reviewerLb,
         graph,
         devlogsPerDayThisWeek,
         numberNeededToTodaysGoal: goalMatch ? Number(goalMatch[0]) : null,
-        personalStats
+        personalStats,
       };
     } catch (err: any) {
       return null;
