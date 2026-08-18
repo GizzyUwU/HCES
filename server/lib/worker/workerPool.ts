@@ -1,7 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import { db, logger, opClient } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
-import { and, avg, count, eq, gte, isNotNull } from "drizzle-orm";
+import { and, avg, count, eq, gte, isNotNull, lt } from "drizzle-orm";
 import { workers as workersSchema } from "@server/schema/workers";
 import { createHash } from "node:crypto";
 import {
@@ -37,6 +37,7 @@ export async function enableLocalWorker(key: string, versionSHA: string) {
     .update(workersSchema)
     .set({
       connected: true,
+      lastConnectedAt: new Date(),
       versionSHA,
     })
     .where(eq(workersSchema.keyHash, hash))
@@ -192,8 +193,7 @@ export async function recordCompletion(
   const [row] = await db
     .update(workerStats)
     .set({
-      latencyMs,
-      bytes,
+      latencyMs
     })
     .returning({ workerId: workerStats.workerId, scraper: workerStats.scraper })
     .where(eq(workerStats.id, rowId))
@@ -265,6 +265,17 @@ export function sendToWorker(
       }),
     );
   });
+}
+
+export async function cleanupUncWorkerSttas(): Promise<void> {
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+  const rows = await db
+    .delete(workerStats)
+    .where(lt(workerStats.lastHit, cutoff))
+    .returning({ id: workerStats.id})
+  if (rows.length > 0) logger.info("cleaned up unc worker stats", {
+    count: rows.length
+  })
 }
 
 export function resolveJob(

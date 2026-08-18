@@ -18,6 +18,7 @@ import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 import { startRemoteWorker } from "./lib/worker/workerRuntime";
 import {
+  cleanupUncWorkerSttas,
   enableLocalWorker,
   resetStaleConnections,
 } from "./lib/worker/workerPool";
@@ -205,6 +206,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         name: "sessionCleanup",
         pattern: Patterns.EVERY_10_MINUTES,
         run: async () => {
+          void cleanupUncWorkerSttas()
           const res = await db
             .delete(session)
             .where(

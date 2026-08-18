@@ -1,4 +1,4 @@
-import axios, { isAxiosError, type AxiosInstance } from "axios";
+import axios, { type AxiosInstance } from "axios";
 import { logger as LogType } from "@server/index.ts";
 import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";

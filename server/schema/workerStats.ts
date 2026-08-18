@@ -11,7 +11,6 @@ export const workerStats = pgTable(
     workerId: varchar("worker_id").references(() => workers.id, { onDelete: "cascade" }).notNull(),
     scraper: varchar("scraper").notNull(),
     latencyMs: integer("latency_ms"),
-    bytes: integer("bytes").default(0).notNull(),
     lastHit: timestamp("last_hit").defaultNow().notNull(),
   }, (table) => [
     index("workerstats_path_worker_idx").on(table.scraper, table.workerId, table.lastHit)
