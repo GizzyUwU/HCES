@@ -1,7 +1,7 @@
 import { db, logger } from "@server/index";
 import Elysia, { type TSchema } from "elysia";
 import { z } from "zod";
-import { Compile } from "@sinclair/typemap";
+import { TypeCompiler } from "@sinclair/typebox/compiler";
 import { createHash } from "crypto";
 import {
   Channel,
@@ -13,7 +13,7 @@ const intervals = new Map<string, ReturnType<typeof setInterval>>();
 const pingTimeouts = new Map<string, ReturnType<typeof setInterval>>();
 
 export function wsSchema<T extends TSchema>(schema: T) {
-  return Object.assign({}, schema, Compile(schema)) as any;
+  return Object.assign({}, schema, TypeCompiler.Compile(schema)) as any;
 }
 
 function clearSubs(wsId: string) {
