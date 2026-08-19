@@ -1,5 +1,5 @@
 import { db, logger } from "@server/index";
-import Elysia, { type TSchema } from "elysia";
+import Elysia from "elysia";
 import { z } from "zod";
 import { createHash } from "crypto";
 import {
@@ -10,7 +10,6 @@ import { apiKeys } from "@server/schema/apiKeys";
 import { eq } from "drizzle-orm";
 const intervals = new Map<string, ReturnType<typeof setInterval>>();
 const pingTimeouts = new Map<string, ReturnType<typeof setInterval>>();
-
 
 function clearSubs(wsId: string) {
   for (const k of intervals.keys()) {

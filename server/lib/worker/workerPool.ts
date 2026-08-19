@@ -1,7 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import { db, logger, opClient } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
-import { and, avg, count, eq, gte, isNotNull, lt } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { workers as workersSchema } from "@server/schema/workers";
 import { createHash } from "node:crypto";
 import {
@@ -29,6 +29,52 @@ const pending = new Map<
     timeout: ReturnType<typeof setTimeout>;
   }
 >();
+
+const localWorkerStats = new Map<
+  string,
+  Map<
+    string,
+    {
+      hits: number[];
+      latencies: {
+        at: number;
+        ms: number;
+      }[];
+    }
+  >
+>();
+
+function getStat(
+  scraper: string,
+  workerId: string,
+): {
+  hits: number[];
+  latencies: {
+    at: number;
+    ms: number;
+  }[];
+} {
+  let byWorker = localWorkerStats.get(scraper);
+  if (!byWorker) localWorkerStats.set(scraper, (byWorker = new Map()));
+  let s = byWorker.get(workerId);
+  if (!s) byWorker.set(workerId, (s = { hits: [], latencies: [] }));
+  return s;
+}
+
+function prune(
+  s: {
+    hits: number[];
+    latencies: {
+      at: number;
+      ms: number;
+    }[];
+  },
+  now: number,
+): void {
+  s.hits = s.hits.filter((t) => t > now - 60 * 1000);
+  s.latencies = s.latencies.filter((l) => l.at > now - 300 * 1000);
+  return;
+}
 
 let localWorker = "";
 export async function enableLocalWorker(key: string, versionSHA: string) {
@@ -114,68 +160,29 @@ function scraperNameFromPath(path: string): string {
   return paths[2] ?? path;
 }
 
-export async function pickWorker(path: string): Promise<string | null> {
+export async function pickWorker(path: string): Promise<{ scraper: string; workerId: string | null } | null> {
   const candidates = candidateIds();
   if (candidates.length === 0) return null;
-
+  const scraper = scraperNameFromPath(path);
   const now = Date.now();
-  const rateWindowStart = new Date(now - 60 * 1000);
-  const latencyWindowStart = new Date(now - 5 * 60 * 1000);
-  const [hitRows, latencyRows] = await Promise.all([
-    db
-      .select({
-        workerId: workerStats.workerId,
-        hits: count(),
-      })
-      .from(workerStats)
-      .where(
-        and(
-          eq(workerStats.scraper, scraperNameFromPath(path)),
-          gte(workerStats.lastHit, rateWindowStart),
-        ),
-      )
-      .groupBy(workerStats.workerId),
-    db
-      .select({
-        workerId: workerStats.workerId,
-        avgLatency: avg(workerStats.latencyMs),
-      })
-      .from(workerStats)
-      .where(
-        and(
-          eq(workerStats.scraper, scraperNameFromPath(path)),
-          gte(workerStats.lastHit, latencyWindowStart),
-          isNotNull(workerStats.latencyMs),
-        ),
-      )
-      .groupBy(workerStats.workerId),
-  ]);
-
-  const hitsByWorker = new Map(
-    hitRows.map((row) => [row.workerId, Number(row.hits)]),
-  );
-  const latencyByWorker = new Map(
-    latencyRows.map((row) => [row.workerId, Number(row.avgLatency ?? 0)]),
-  );
   let best: string | null = null,
     bestHits = Infinity,
     bestLatency = Infinity;
   for (const id of candidates) {
-    const hits = hitsByWorker.get(id) ?? 0;
-    const latency = latencyByWorker.get(id) ?? 0;
+    const s = getStat(scraper, id);
+    const hits = s.hits.length;
+    const latency = s.latencies.length;
     if (hits < bestHits || (hits === bestHits && latency < bestLatency))
       ((best = id), (bestHits = hits), (bestLatency = latency));
   }
 
-  return best;
+  if (best) getStat(scraper, best).hits.push(now);
+  return { scraper, workerId: best };
 }
 
 const pendingDispatches = new Map<string, Promise<unknown>>();
 
-export function recordDispatch(
-  workerId: string,
-  path: string,
-): string {
+export function recordDispatch(workerId: string, path: string): string {
   const id = createId();
   const insert = db
     .insert(workerStats)
@@ -195,36 +202,27 @@ export function recordDispatch(
 }
 
 export async function recordCompletion(
+  scraper: string,
   rowId: string,
   latencyMs: number,
   bytes: number,
 ): Promise<void> {
   await pendingDispatches.get(rowId);
-  const [row] = await db
-    .update(workerStats)
-    .set({
-      latencyMs,
-    })
-    .returning({ workerId: workerStats.workerId, scraper: workerStats.scraper })
-    .where(eq(workerStats.id, rowId))
-    .catch((err) => {
-      logger.error("failed to record worker latency", { err });
-      return [] as { workerId: string; scraper: string }[];
+  getStat(scraper, rowId).latencies.push({ at: Date.now(), ms: latencyMs });
+  if (opClient) {
+    opClient.identify({
+      profileId: rowId,
+      properties: {
+        bytes,
+        scraper: scraper,
+        latencyMs,
+        dev: process.env["DEV"] ?? false,
+      },
     });
 
-  if (!row || Object.keys(row).length === 0 || !opClient) return;
-  opClient.identify({
-    profileId: row?.workerId,
-    properties: {
-      bytes,
-      scraper: row?.scraper,
-      latencyMs,
-      dev: process.env["DEV"] ?? false,
-    },
-  });
-
-  await opClient.track("workers");
-  opClient.clear();
+    await opClient.track("workers");
+    opClient.clear();
+  }
 }
 
 export async function resetStaleConnections(): Promise<void> {

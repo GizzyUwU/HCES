@@ -10,7 +10,7 @@ import {
 
 const localDispatches = new WeakMap<
   Request,
-  { rowId: string; startedAt: number }
+  { scraper: string; rowId: string; startedAt: number }
   >();
 
 function jsonResponse(status: number, body: unknown, extraHeaders?: Record<string, string>) {
@@ -33,14 +33,15 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
 
       if (isInternalWorkerRequest) return;
 
-      const workerId = await pickWorker(path);
-      if (!workerId)
+      const worker = await pickWorker(path);
+      if (!worker || !worker.workerId)
         return jsonResponse(503, { err: { status: 503, msg: "no_workers_available" } });
+      const { scraper, workerId } = worker;
       const rowId = recordDispatch(workerId, path);
       const startedAt = performance.now();
       if (isLocalWorker(workerId)) {
         localDispatches.set(request, {
-          rowId, startedAt
+          scraper, rowId, startedAt
         })
         return;
       }
@@ -53,6 +54,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
       try {
         const result = await sendToWorker(workerId, path, forwarded);
         recordCompletion(
+          scraper,
           rowId,
           Math.round(performance.now() - startedAt),
           result.bytes,
@@ -61,6 +63,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         return jsonResponse(result.status, result.data, result.headers);
       } catch {
         recordCompletion(
+          scraper,
           rowId,
           Math.round(performance.now() - startedAt),
           0
@@ -74,6 +77,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
       localDispatches.delete(request);
       const bytes = Buffer.byteLength(JSON.stringify(response ?? null), "utf-8");
       recordCompletion(
+        dispatched.scraper,
         dispatched.rowId,
         Math.round(performance.now() - dispatched.startedAt),
         bytes
