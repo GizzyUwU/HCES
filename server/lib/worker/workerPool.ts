@@ -170,6 +170,7 @@ export async function pickWorker(path: string): Promise<{ scraper: string; worke
     bestLatency = Infinity;
   for (const id of candidates) {
     const s = getStat(scraper, id);
+    prune(s, now);
     const hits = s.hits.length;
     const latency = s.latencies.length;
     if (hits < bestHits || (hits === bestHits && latency < bestLatency))
@@ -203,6 +204,7 @@ export function recordDispatch(workerId: string, path: string): string {
 
 export async function recordCompletion(
   scraper: string,
+  path: string,
   rowId: string,
   latencyMs: number,
   bytes: number,
@@ -214,7 +216,8 @@ export async function recordCompletion(
       profileId: rowId,
       properties: {
         bytes,
-        scraper: scraper,
+        scraper,
+        path,
         latencyMs,
         dev: process.env["DEV"] ?? false,
       },

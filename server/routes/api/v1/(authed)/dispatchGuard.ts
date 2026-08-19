@@ -1,7 +1,7 @@
 import Elysia from "elysia";
 import { errorModel } from "@server/lib/errorModel";
 import {
-    isLocalWorker,
+  isLocalWorker,
   pickWorker,
   recordCompletion,
   recordDispatch,
@@ -10,13 +10,17 @@ import {
 
 const localDispatches = new WeakMap<
   Request,
-  { scraper: string; rowId: string; startedAt: number }
-  >();
+  { scraper: string; path: string; rowId: string; startedAt: number }
+>();
 
-function jsonResponse(status: number, body: unknown, extraHeaders?: Record<string, string>) {
+function jsonResponse(
+  status: number,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+) {
   return new Response(JSON.stringify(body), {
     status,
-       headers: { "content-type": "application/json", ...extraHeaders },
+    headers: { "content-type": "application/json", ...extraHeaders },
   });
 }
 
@@ -29,20 +33,28 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
     .onBeforeHandle(async ({ path, set, headers, request }) => {
       const requestUrl = new URL(request.url);
       const isInternalWorkerRequest =
-        headers["x-hces-worker-internal"] === "1" && (requestUrl.host === "internal" || requestUrl.host.includes("127.0.0.1"));
+        headers["x-hces-worker-internal"] === "1" &&
+        (requestUrl.host === "internal" ||
+          requestUrl.host.includes("127.0.0.1"));
 
       if (isInternalWorkerRequest) return;
 
       const worker = await pickWorker(path);
       if (!worker || !worker.workerId)
-        return jsonResponse(503, { err: { status: 503, msg: "no_workers_available" } });
+        return jsonResponse(503, {
+          err: { status: 503, msg: "no_workers_available" },
+        });
       const { scraper, workerId } = worker;
       const rowId = recordDispatch(workerId, path);
       const startedAt = performance.now();
+      console.log(path);
       if (isLocalWorker(workerId)) {
         localDispatches.set(request, {
-          scraper, rowId, startedAt
-        })
+          scraper,
+          path,
+          rowId,
+          startedAt,
+        });
         return;
       }
       const forwarded: Record<string, string> = {};
@@ -55,6 +67,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         const result = await sendToWorker(workerId, path, forwarded);
         recordCompletion(
           scraper,
+          path,
           rowId,
           Math.round(performance.now() - startedAt),
           result.bytes,
@@ -64,23 +77,30 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
       } catch {
         recordCompletion(
           scraper,
+          path,
           rowId,
           Math.round(performance.now() - startedAt),
-          0
+          0,
         );
-        return jsonResponse(502, { err: { status: 502, msg: "worker_unavailable" } });
+        return jsonResponse(502, {
+          err: { status: 502, msg: "worker_unavailable" },
+        });
       }
     })
     .onAfterHandle(({ request, response }) => {
-      const dispatched = localDispatches.get(request)
+      const dispatched = localDispatches.get(request);
       if (!dispatched) return;
       localDispatches.delete(request);
-      const bytes = Buffer.byteLength(JSON.stringify(response ?? null), "utf-8");
+      const bytes = Buffer.byteLength(
+        JSON.stringify(response ?? null),
+        "utf-8",
+      );
       recordCompletion(
         dispatched.scraper,
+        dispatched.path,
         dispatched.rowId,
         Math.round(performance.now() - dispatched.startedAt),
-        bytes
+        bytes,
       );
     })
     .use(errorModel)
