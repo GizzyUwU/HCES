@@ -25,6 +25,7 @@ import {
 import { workerChannel } from "./lib/worker/workerChannel";
 import { OpenPanel } from "@openpanel/sdk";
 import { Pool } from "pg";
+import { preconnectScrapers } from "./scrapers/preconnect";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -122,6 +123,8 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     .listen(process.env["PORT"] || 8000, ({ url }) =>
       console.log(`Worker is running on ${url}`),
     );
+
+  preconnectScrapers()
 } else {
   const { auth } = await import("./lib/auth");
   db = drizzle({
@@ -264,9 +267,22 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       console.log(`Server is running on ${url}`),
     );
 
-  if (process.env["WORKER"])
+  if (process.env["WORKER"]) {
+    preconnectScrapers()
     enableLocalWorker(
       process.env["WORKER_KEY"]!,
       process.env["GIT_COMMIT_SHA"] || "1"!,
     );
+  }
 }
+
+const rawConsoleWarn = console.warn.bind(console);
+console.warn = (...args: unknown[]) => {
+  const text = args
+    .map((a) => (a instanceof Error ? a.message : String(a)))
+    .join(" ");
+  if (text.includes("[exact-mirror] TypeBox's TypeCompiler is required to use Union")) {
+    return;
+  }
+  rawConsoleWarn(...args);
+};

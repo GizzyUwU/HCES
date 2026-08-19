@@ -8,13 +8,9 @@ import {
 } from "ws-asyncapi";
 import { apiKeys } from "@server/schema/apiKeys";
 import { eq } from "drizzle-orm";
-import { TypeCompiler } from "elysia/type-system";
 const intervals = new Map<string, ReturnType<typeof setInterval>>();
 const pingTimeouts = new Map<string, ReturnType<typeof setInterval>>();
 
-export function wsSchema<T extends TSchema>(schema: T) {
-  return Object.assign({}, schema, TypeCompiler.Compile(schema)) as any;
-}
 
 function clearSubs(wsId: string) {
   for (const k of intervals.keys()) {

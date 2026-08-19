@@ -13,7 +13,11 @@ export default class Stardance {
   private ready: Promise<void>;
   private logger: typeof LogType;
   private keySet: boolean = false;
+  private cookie: string = "";
   public updatedCookie: string | undefined;
+  static config = {
+    baseUrl: "https://stardance.hackclub.com"
+  }
 
   constructor({ logger, cookie }: { logger: typeof LogType; cookie?: string }) {
     this.logger = logger;
@@ -21,7 +25,10 @@ export default class Stardance {
       baseURL: "https://stardance.hackclub.com",
       headers: cookie ? { Cookie: cookie } : undefined,
     });
-    if (cookie) this.keySet = true;
+    if (cookie) {
+      this.keySet = true;
+      this.cookie = cookie;
+    }
     this.ready = Promise.resolve();
 
     this.fetch.interceptors.response.use((res) => {
@@ -38,32 +45,47 @@ export default class Stardance {
     });
   }
 
+  private async request(path: string, init?: RequestInit): Promise<Response> {
+    const headers = new Headers(init?.headers);
+    if (this.cookie) headers.set("Cookie", this.cookie);
+    const res = await fetch("https://stardance.hackclub.com" + path, {
+      ...init,
+      headers,
+    });
+    this.lastCode = res.status;
+    for (const cookie of res.headers.getSetCookie()) {
+      if (cookie.startsWith("_stardance_session_4=")) {
+        this.updatedCookie = cookie.split(";", 1)[0];
+      }
+    }
+    return res;
+  }
+
   async shop(
     category?: string,
   ): Promise<t.Static<(typeof SDTypes)["shopItems"]> | null> {
     await this.ready;
-    const res = await this.fetch.request({
-      method: "GET",
-      url:
-        "/shop" +
+    const res = await this.request(
+      "/shop" +
         (category && category.length > 0 ? "/" + category : "/category/all"),
-    });
+    );
+    const html = res.text();
     this.lastCode = res.status;
     if (!(
-      typeof res.data === "string" &&
+      typeof html === "string" &&
       (
-        String(res.headers["content-type"]) ??
-        String(res.headers["Content-Type"]) ??
+        String(res.headers.get("content-type")) ??
+        String(res.headers.get("Content-Type")) ??
         ""
       ).includes("text/html")
     )) {
       this.logger.warn("Shop endpoint didn't return HTML", {
-        contentType: String(res.headers["Content-Type"]) ?? "",
+        contentType: String(res.headers.get("Content-Type")) ?? "",
         status: res.status,
       });
       return null;
     }
-    const $ = load(res.data);
+    const $ = load(html);
     const shopItems = $(".shop-item-card").toArray();
     const normalizeItems = shopItems.map((bItem) => {
       const item = $(bItem);
@@ -219,7 +241,9 @@ export default class Stardance {
       : null;
 
     const currentPayMatch = tierNote.match(/up from ([\d.]+)/);
-    const currentPay = currentPayMatch ? parseNum(String(currentPayMatch[1])) : 0;
+    const currentPay = currentPayMatch
+      ? parseNum(String(currentPayMatch[1]))
+      : 0;
     return {
       certifiedHours,
       diffPplProjectsReviewed,
@@ -236,27 +260,30 @@ export default class Stardance {
   async goiStats(): Promise<t.Static<(typeof SDTypes)["goiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
+    const start = performance.now();
     try {
-      const res = await this.fetch.request({
-        method: "GET",
-        url: "/admin/certification/review/dashboard",
-      });
+      const res = await this.request("/admin/certification/review/dashboard");
+      const html = await res.text();
+      const received = performance.now();
       this.lastCode = res.status;
       if (!(
-        typeof res.data === "string" &&
+        typeof html === "string" &&
         (
-          String(res.headers["content-type"]) ??
-          String(res.headers["Content-Type"]) ??
+          String(res.headers.get("content-type")) ??
+          String(res.headers.get("Content-Type")) ??
           ""
         ).includes("text/html")
       )) {
         this.logger.warn("GOI Stats endpoint didn't return HTML", {
-          contentType: String(res.headers["Content-Type"]) ?? "",
+          contentType:
+            String(res.headers.get("Content-Type")) ??
+            String(res.headers.get("content-type")) ??
+            "",
           status: res.status,
         });
         return null;
       }
-      const $ = load(res.data);
+      const $ = load(html);
       const lbRows = $(".ysws-dashboard__table tbody tr").toArray();
       const reviewerLb = await this.goiReviewerLb($, lbRows);
       const graph = await this.goiReviewerGraph($);
@@ -275,7 +302,13 @@ export default class Stardance {
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^@/, "");
-
+      const parsed = performance.now();
+      console.log({
+        request: `${(received - start).toFixed(2)}ms`,
+        parse: `${(parsed - received).toFixed(2)}ms`,
+        total: `${(parsed - start).toFixed(2)}ms`,
+        bytes: html.length,
+      });
       return {
         myUsername,
         reviewerLb,
@@ -289,42 +322,56 @@ export default class Stardance {
     }
   }
 
-  async project(data: t.Static<(typeof SDTypes)["projectParams"]>): Promise<Partial<t.Static<(typeof SDTypes)["project"]> | null>> {
+  async project(
+    data: t.Static<(typeof SDTypes)["projectParams"]>,
+  ): Promise<Partial<t.Static<(typeof SDTypes)["project"]> | null>> {
     await this.ready;
     try {
-      const res = await this.fetch.request({
-        method: "GET",
-        url: "/projects/" + data.id,
-      });
+      const res = await this.request("/projects/" + data.id);
+      const html = res.text();
       this.lastCode = res.status;
       if (!(
-        typeof res.data === "string" &&
+        typeof html === "string" &&
         (
-          String(res.headers["content-type"]) ??
-          String(res.headers["Content-Type"]) ??
+          String(res.headers.get("content-type")) ??
+          String(res.headers.get("Content-Type")) ??
           ""
         ).includes("text/html")
       )) {
         this.logger.warn("Project endpoint didn't return HTML", {
-          contentType: String(res.headers["Content-Type"]) ?? "",
+          contentType:
+            String(res.headers.get("Content-Type")) ??
+            String(res.headers.get("Content-Type")) ??
+            "",
           status: res.status,
-          projectId: data.id
+          projectId: data.id,
         });
         return null;
       }
-      const $ = load(res.data);
+      const $ = load(html);
       const projectShowPanel = $(".project-show__panel");
       const name = projectShowPanel.find(".project-show__title").text();
-      const description = projectShowPanel.find(".project-show__description").text();
-      const banner = projectShowPanel.find(".project-show__banner-image").attr("src") ?? "no_image_provided";
-      const makerPFP = projectShowPanel.find(".project-show__avatar").attr("src") ?? "no_image_provided";
+      const description = projectShowPanel
+        .find(".project-show__description")
+        .text();
+      const banner =
+        projectShowPanel.find(".project-show__banner-image").attr("src") ??
+        "no_image_provided";
+      const makerPFP =
+        projectShowPanel.find(".project-show__avatar").attr("src") ??
+        "no_image_provided";
       const makerName = projectShowPanel.find(".project-show__author").text();
-      const totalFollowers = parseNum(projectShowPanel.find(".project-show__followers strong").text().trim());
-      let totalDevlogs = 0, totalHrsInMinutes = 0;
+      const totalFollowers = parseNum(
+        projectShowPanel.find(".project-show__followers strong").text().trim(),
+      );
+      let totalDevlogs = 0,
+        totalHrsInMinutes = 0;
       projectShowPanel.find(".project-show__stats-item").each((_, el) => {
         const item = $(el);
         const label = item.find(".project-show__stats-label").text().trim();
-        const val = parseNum(item.find(".project-show__stats-num").text().trim());
+        const val = parseNum(
+          item.find(".project-show__stats-num").text().trim(),
+        );
         switch (label) {
           case "Devlogs": {
             totalDevlogs = val;
@@ -337,7 +384,7 @@ export default class Stardance {
           default:
             return;
         }
-      })
+      });
 
       return {
         name,
@@ -345,12 +392,12 @@ export default class Stardance {
         banner,
         maker: {
           pfp: makerPFP,
-          name: makerName
+          name: makerName,
         },
         totalDevlogs,
         totalMinutes: totalHrsInMinutes,
         followers: totalFollowers,
-      }
+      };
     } catch (err: any) {
       return null;
     }
