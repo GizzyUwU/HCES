@@ -36,7 +36,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
       const workerId = await pickWorker(path);
       if (!workerId)
         return jsonResponse(503, { err: { status: 503, msg: "no_workers_available" } });
-      const rowId = await recordDispatch(workerId, path);
+      const rowId = recordDispatch(workerId, path);
       const startedAt = performance.now();
       if (isLocalWorker(workerId)) {
         localDispatches.set(request, {

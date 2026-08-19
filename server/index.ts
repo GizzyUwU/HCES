@@ -24,6 +24,7 @@ import {
 } from "./lib/worker/workerPool";
 import { workerChannel } from "./lib/worker/workerChannel";
 import { OpenPanel } from "@openpanel/sdk";
+import { Pool } from "pg";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -123,7 +124,14 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     );
 } else {
   const { auth } = await import("./lib/auth");
-  db = drizzle(process.env.DATABASE_URL!);
+  db = drizzle({
+    client: new Pool({
+      connectionString: process.env.DATABASE_URL!,
+      max: Number(process.env["DB_POOL_MAX"]) || 20,
+      idleTimeoutMillis: 30 * 1000,
+      connectionTimeoutMillis: 5 * 1000
+    }),
+  });
   await resetStaleConnections();
 
   const routes = await fsr({
@@ -149,22 +157,6 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
             responseHeader: "x-request-id",
           },
           include: ["requestId", "method", "path"],
-          enrich: async (ctx) => {
-            const cookieHeader = ctx.request.headers.get("cookie") ?? "";
-            const sid = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/)?.[1];
-
-            let userId: string | undefined;
-            if (sid) {
-              const [s] = await db
-                .select({ userId: session.userId })
-                .from(session)
-                .where(eq(session.id, sid))
-                .limit(1);
-              userId = s?.userId ?? undefined;
-            }
-
-            return { route: ctx.path, userId };
-          },
         },
       }),
     )
@@ -206,7 +198,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         name: "sessionCleanup",
         pattern: Patterns.EVERY_10_MINUTES,
         run: async () => {
-          void cleanupUncWorkerSttas()
+          void cleanupUncWorkerSttas();
           const res = await db
             .delete(session)
             .where(

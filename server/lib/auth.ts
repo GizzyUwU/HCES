@@ -8,7 +8,7 @@ import { db } from "@server/index";
 import { session, oauthToken, users } from "@server/schema/users";
 import { eq, and } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
-import { getOrCreateSession } from "@server/lib/session";
+import { getOrCreateSession, invalidateSession } from "@server/lib/session";
 import { APIError, UnverifiedAccountError } from "@server/lib/error";
 import { logger } from "@server/index";
 
@@ -129,6 +129,7 @@ export const auth = oauth2({
         .update(session)
         .set({ oauthState: nonce })
         .where(eq(session.id, s.id));
+      invalidateSession(cookie);
       return nonce;
     },
   },
@@ -172,12 +173,14 @@ export const auth = oauth2({
 
       if (!s.userId) {
         await db.update(session).set({ userId }).where(eq(session.id, s.id));
+        invalidateSession(cookie);
       }
     },
     async delete({ cookie }) {
       const s = await getOrCreateSession(cookie);
       if (!s.userId) return;
       await db.delete(session).where(eq(session.id, s.id));
+      invalidateSession(cookie);
     },
   },
 });

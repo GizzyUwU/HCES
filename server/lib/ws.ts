@@ -1,7 +1,6 @@
 import { db, logger } from "@server/index";
 import Elysia, { type TSchema } from "elysia";
 import { z } from "zod";
-import { TypeCompiler } from "@sinclair/typebox/compiler";
 import { createHash } from "crypto";
 import {
   Channel,
@@ -9,6 +8,7 @@ import {
 } from "ws-asyncapi";
 import { apiKeys } from "@server/schema/apiKeys";
 import { eq } from "drizzle-orm";
+import { TypeCompiler } from "elysia/type-system";
 const intervals = new Map<string, ReturnType<typeof setInterval>>();
 const pingTimeouts = new Map<string, ReturnType<typeof setInterval>>();
 

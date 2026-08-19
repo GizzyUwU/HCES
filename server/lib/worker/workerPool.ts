@@ -170,19 +170,28 @@ export async function pickWorker(path: string): Promise<string | null> {
   return best;
 }
 
-export async function recordDispatch(
+const pendingDispatches = new Map<string, Promise<unknown>>();
+
+export function recordDispatch(
   workerId: string,
   path: string,
-): Promise<string> {
-  const [logged] = await db
+): string {
+  const id = createId();
+  const insert = db
     .insert(workerStats)
     .values({
+      id,
       workerId: workerId,
       scraper: scraperNameFromPath(path),
     })
-    .returning({ id: workerStats.id });
-  if (!logged) throw new Error("failed_to_log_request");
-  return logged.id;
+    .catch((err) => {
+      logger.error("failed to record dispatch", { err });
+    })
+    .finally(() => {
+      pendingDispatches.delete(id);
+    });
+  pendingDispatches.set(id, insert);
+  return id;
 }
 
 export async function recordCompletion(
@@ -190,10 +199,11 @@ export async function recordCompletion(
   latencyMs: number,
   bytes: number,
 ): Promise<void> {
+  await pendingDispatches.get(rowId);
   const [row] = await db
     .update(workerStats)
     .set({
-      latencyMs
+      latencyMs,
     })
     .returning({ workerId: workerStats.workerId, scraper: workerStats.scraper })
     .where(eq(workerStats.id, rowId))
@@ -209,7 +219,7 @@ export async function recordCompletion(
       bytes,
       scraper: row?.scraper,
       latencyMs,
-      dev: process.env["DEV"] ?? false
+      dev: process.env["DEV"] ?? false,
     },
   });
 
@@ -272,10 +282,11 @@ export async function cleanupUncWorkerSttas(): Promise<void> {
   const rows = await db
     .delete(workerStats)
     .where(lt(workerStats.lastHit, cutoff))
-    .returning({ id: workerStats.id})
-  if (rows.length > 0) logger.info("cleaned up unc worker stats", {
-    count: rows.length
-  })
+    .returning({ id: workerStats.id });
+  if (rows.length > 0)
+    logger.info("cleaned up unc worker stats", {
+      count: rows.length,
+    });
 }
 
 export function resolveJob(
