@@ -3,7 +3,9 @@ import { logger as LogType } from "@server/index.ts";
 import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import { SDTypes } from "./types";
+// import { Compatability } from "../compatibility/";
 import t from "typebox";
+const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
 
 export default class Stardance {
   lastCode: number | null = null;
@@ -171,7 +173,6 @@ export default class Stardance {
       rank: 0,
       totalPpl: 0,
     };
-    const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
 
     for (const bStat of stats) {
       const stat = $(bStat);
@@ -283,6 +284,73 @@ export default class Stardance {
         numberNeededToTodaysGoal: goalMatch ? Number(goalMatch[0]) : null,
         personalStats,
       };
+    } catch (err: any) {
+      return null;
+    }
+  }
+
+  async project(data: t.Static<(typeof SDTypes)["projectParams"]>): Promise<Partial<t.Static<(typeof SDTypes)["project"]> | null>> {
+    await this.ready;
+    try {
+      const res = await this.fetch.request({
+        method: "GET",
+        url: "/projects/" + data.id,
+      });
+      this.lastCode = res.status;
+      if (!(
+        typeof res.data === "string" &&
+        (
+          String(res.headers["content-type"]) ??
+          String(res.headers["Content-Type"]) ??
+          ""
+        ).includes("text/html")
+      )) {
+        this.logger.warn("Project endpoint didn't return HTML", {
+          contentType: String(res.headers["Content-Type"]) ?? "",
+          status: res.status,
+          projectId: data.id
+        });
+        return null;
+      }
+      const $ = load(res.data);
+      const projectShowPanel = $(".project-show__panel");
+      const name = projectShowPanel.find(".project-show__title").text();
+      const description = projectShowPanel.find(".project-show__description").text();
+      const banner = projectShowPanel.find(".project-show__banner-image").attr("src") ?? "no_image_provided";
+      const makerPFP = projectShowPanel.find(".project-show__avatar").attr("src") ?? "no_image_provided";
+      const makerName = projectShowPanel.find(".project-show__author").text();
+      const totalFollowers = parseNum(projectShowPanel.find(".project-show__followers strong").text().trim());
+      let totalDevlogs = 0, totalHrsInMinutes = 0;
+      projectShowPanel.find(".project-show__stats-item").each((_, el) => {
+        const item = $(el);
+        const label = item.find(".project-show__stats-label").text().trim();
+        const val = parseNum(item.find(".project-show__stats-num").text().trim());
+        switch (label) {
+          case "Devlogs": {
+            totalDevlogs = val;
+            return;
+          }
+          case "Total hours": {
+            totalHrsInMinutes = val * 60;
+            return;
+          }
+          default:
+            return;
+        }
+      })
+
+      return {
+        name,
+        description,
+        banner,
+        maker: {
+          pfp: makerPFP,
+          name: makerName
+        },
+        totalDevlogs,
+        totalMinutes: totalHrsInMinutes,
+        followers: totalFollowers,
+      }
     } catch (err: any) {
       return null;
     }
