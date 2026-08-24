@@ -47,7 +47,6 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
       const { scraper, workerId } = worker;
       const rowId = recordDispatch(workerId, path);
       const startedAt = performance.now();
-      console.log(path);
       if (isLocalWorker(workerId)) {
         localDispatches.set(request, {
           scraper,

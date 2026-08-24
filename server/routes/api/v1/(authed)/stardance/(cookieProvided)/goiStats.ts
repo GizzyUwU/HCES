@@ -2,7 +2,6 @@ import Elysia from "elysia";
 import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
 import { stardanceCookie } from "../(cookieProvided)";
-import Stardance from "@server/scrapers/stardance";
 import { SDTypes } from "@server/scrapers/stardance/types";
 import { dispatchGuard } from "../../dispatchGuard";
 
@@ -11,25 +10,17 @@ export default new Elysia()
   .use(dispatchGuard(["x-stardance-cookie"]))
   .get(
     "",
-    async ({ set, stardanceCookie }) => {
+    async ({ client }) => {
       try {
-        const authedClient = new Stardance({
-          logger,
-          cookie: stardanceCookie,
-        });
-
-        const res = await authedClient.goiStats();
+        const res = await client.goiStats();
         if (!res)
           throw new APIError({
             status: 500,
             msg: "internal_server_error",
           });
-        
-        set.headers["X-Stardance-New-Cookie"] =
-          authedClient.updatedCookie ?? stardanceCookie;
         return res;
       } catch (err) {
-        logger.error("Failed getting me data via api key", {
+        logger.error("Failed getting goi stats data", {
           error: err,
         });
         throw new APIError({
@@ -39,8 +30,12 @@ export default new Elysia()
       }
     },
     {
+      detail: {
+        tags: ["Stardance"],
+        security: [{ Header: [], StardanceCookie: [] }],
+      },
       response: {
-        200: SDTypes["goiStats"],
+        200: SDTypes["GoiStats"],
       },
     },
   );

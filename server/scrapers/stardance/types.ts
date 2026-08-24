@@ -1,21 +1,15 @@
-import { t, type TSchema } from "elysia";
-import { TypeCompiler } from "elysia/type-system";
-export const Nullable = <T extends TSchema>(schema: T) => {
-  const union = t.Union([t.Null(), schema]);
-  return Object.assign({}, union, TypeCompiler.Compile(union)) as typeof union;
-};
-
+import { t } from "elysia";
+import { Nullable } from "../typeUtils";
 export namespace SDTypes {
-  export const shopItems = t.Array(
-    t.Object({
-      title: t.String(),
-      description: t.String(),
-      avgHours: t.String(),
-      price: t.Number({ exclusiveMinimum: -Infinity }),
-    }),
-  );
+  export const ShopItem = t.Object({
+    title: t.String(),
+    description: t.String(),
+    avgHours: t.String(),
+    price: t.Number({ exclusiveMinimum: -Infinity }),
+  });
+  export const ShopItems = t.Array(ShopItem);
 
-  export const goiStats = t.Object({
+  export const GoiStats = t.Object({
     myUsername: t.String(),
     reviewerLb: t.Array(
       t.Object({
@@ -57,12 +51,39 @@ export namespace SDTypes {
     }),
   });
 
-  export const projectParams = t.Object({
+  export const ProjectParams = t.Object({
     id: t.Number({
-      description: "Project ID"
-    })
-  })
-  export const project = t.Object({
+      description: "Project ID",
+    }),
+  });
+  export const DevlogParams = t.Composite([
+    ProjectParams,
+    t.Object({
+      devlogId: t.Optional(t.Number({
+        description: "Devlog ID",
+      })),
+    }),
+  ]);
+  export const Devlog = t.Object({
+    id: t.Number(),
+    posted: t.Date(),
+    timeLogged: t.String({
+      description: "Time of a devlog in ISO 8601 Duration",
+    }),
+    description: t.String(),
+    imageUrls: t.Array(
+      t.Object({
+        alt: t.String(),
+        src: t.String(),
+      }),
+    ),
+    totalComments: t.Number(),
+    totalReposts: t.Number(),
+    totalLikes: t.Number(),
+    totalViews: t.Number(),
+  });
+  
+  export const Project = t.Object({
     name: t.String(),
     description: t.String(),
     banner: t.String(),
@@ -70,20 +91,10 @@ export namespace SDTypes {
       pfp: t.String(),
       name: t.String(),
     }),
+    isSuperStarred: t.Boolean(),
     totalDevlogs: t.Number(),
-    totalMinutes: t.Number(),
+    totalDuration: t.String({ description: "Total time in ISO 8601 Duration" }),
     followers: t.Number(),
-    devlogs: t.Array(
-      t.Object({
-        posted: t.Date(),
-        timeLogged: t.Number({ description: "Total minutes of a devlog"}),
-        description: t.String(),
-        imageUrls: t.Array(t.String()),
-        totalComments: t.Number(),
-        totalReposts: t.Number(),
-        totalLikes: t.Number(),
-        totalViews: t.Number(),
-      }),
-    ),
+    devlogs: t.Array(Devlog),
   });
 }

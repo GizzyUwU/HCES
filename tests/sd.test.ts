@@ -5,7 +5,6 @@ import { Value } from "typebox/value";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { getLogger } from "@logtape/logtape";
-import { t } from "elysia";
 
 const logger = getLogger(["hces"]);
 async function storeResponse(testName: string, res: unknown) {
@@ -24,7 +23,7 @@ const client = new Stardance({
 test("Shop API returns normal data", async () => {
   const res = await client.shop();
   await storeResponse("shop", res);
-  const errors = [...Value.Errors(SDTypes.shopItems, res)];
+  const errors = [...Value.Errors(SDTypes["ShopItems"], res)];
   if (errors.length > 0) console.error(errors);
   expect(errors).toHaveLength(0);
 });
@@ -34,7 +33,7 @@ test("Project API returns normal data", async () => {
     id: 10129,
   });
   await storeResponse("project", res);
-  const errors = [...Value.Errors(t.Partial(SDTypes.project), res)];
+  const errors = [...Value.Errors(SDTypes["Project"], res)];
   if (errors.length > 0) console.error(errors);
   expect(errors).toHaveLength(0);
 });
@@ -49,7 +48,7 @@ if (process.env["STARDANCE_AUTH_COOKIE"]) {
     const res = await authedClient.goiStats();
     await storeResponse("goiStats", res);
     // expect(true).toBe(true)
-    const errors = [...Value.Errors(SDTypes.goiStats, res)];
+    const errors = [...Value.Errors(SDTypes["GoiStats"], res)];
     if (errors.length > 0) console.error(errors);
     expect(errors).toHaveLength(0);
   });

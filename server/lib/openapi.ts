@@ -12,23 +12,41 @@ export function getPublicOpenApiSpec(
       title: "HCES - API Docs",
       version: "v1",
     },
-    security: [{ "Header": [] }],
-    servers: [
-      { url: "https://hces.gizzy.gay" },
-    ],
+    security: [{ Header: [] }],
+    servers: [{ url: "https://hces.gizzy.gay" }],
     paths: Object.fromEntries(
       Object.entries(paths).filter(
-        ([path]) => path.startsWith("/api/v1") && !path.startsWith("/api/v1/web") && !path.startsWith("/api/v1/docs"),
+        ([path]) =>
+          path.startsWith("/api/v1") &&
+          !path.startsWith("/api/v1/web") &&
+          !path.startsWith("/api/v1/docs") &&
+          !path.startsWith("/api/v1/ws/docs"),
       ),
     ),
     components: {
       ...components,
       securitySchemes: {
-        "Header": {
+        Header: {
           type: "http",
           scheme: "bearer",
         },
+        StardanceCookie: {
+          type: "apiKey",
+          in: "header",
+          name: "x-stardance-cookie",
+        },
       },
     },
+    tags: [
+      {
+        name: "Compatability",
+        description:
+          "All endpoints that provide same schema of data no matter the scraper",
+      },
+      {
+        name: "Stardance",
+        description: "All endpoints that are for Stardance",
+      },
+    ],
   } satisfies OpenAPIV3.Document;
 }

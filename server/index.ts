@@ -18,7 +18,6 @@ import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 import { startRemoteWorker } from "./lib/worker/workerRuntime";
 import {
-  cleanupUncWorkerSttas,
   enableLocalWorker,
   resetStaleConnections,
 } from "./lib/worker/workerPool";
@@ -26,6 +25,7 @@ import { workerChannel } from "./lib/worker/workerChannel";
 import { OpenPanel } from "@openpanel/sdk";
 import { Pool } from "pg";
 import { preconnectScrapers } from "./scrapers/preconnect";
+import { join } from "node:path";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -138,11 +138,13 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
   await resetStaleConnections();
 
   const routes = await fsr({
-    dir: "./routes",
+    dir: join(import.meta.dir, "routes"),
     filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
     logLevel: LogLevel.Default,
   });
-  const baseApp = new Elysia()
+  const baseApp = new Elysia({
+     websocket: { publishToSelf: true },
+  })
     .use(
       elysiaLogger({
         category: ["hces"],
@@ -192,7 +194,10 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         path: "/api/v1/docs",
         specPath: "/api/v1/docs/openapi-internal/json",
         scalar: {
-          url: "/api/v1/docs/json",
+          url: "/api/v1/docs.json",
+          metaData: {
+            title: 'HCES Docs',
+          }
         },
       }),
     )
@@ -201,7 +206,6 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         name: "sessionCleanup",
         pattern: Patterns.EVERY_10_MINUTES,
         run: async () => {
-          void cleanupUncWorkerSttas();
           const res = await db
             .delete(session)
             .where(
@@ -248,10 +252,19 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
   app = baseApp
     .use(wsAsyncAPIAdapter(channels))
     .get("/api/v1/ws/docs", () => getAsyncApiUI(document, "response"))
-    .get("/api/v1/ws/asyncapi.json", () => document)
-    .get("/api/v1/docs/json", () => getPublicOpenApiSpec(baseApp))
+    .get("/api/v1/ws/docs.json", () => document)
     .get(
-      "/api/v1/docs/yaml",
+      "/api/v1/ws/docs.yaml",
+      () =>
+        new Response(YAML.stringify(document, null, 2), {
+          headers: {
+            "content-type": "application/yaml; charset=utf-8",
+          },
+        }),
+    )
+    .get("/api/v1/docs.json", () => getPublicOpenApiSpec(baseApp))
+    .get(
+      "/api/v1/docs.yaml",
       () =>
         new Response(YAML.stringify(getPublicOpenApiSpec(baseApp), null, 2), {
           headers: {

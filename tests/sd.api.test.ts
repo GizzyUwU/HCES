@@ -31,7 +31,7 @@ if (process.env["TEST_API_KEY"] && process.env["STARDANCE_AUTH_COOKIE"]) {
     expect(res.headers.get("x-stardance-new-cookie")).toBeTruthy();
     const data = await res.json();
     await storeResponse("goiStats", data)
-    const errors = [...Value.Errors(SDTypes["goiStats"], data)];
+    const errors = [...Value.Errors(SDTypes["GoiStats"], data)];
     if (errors.length > 0) console.error(errors)
     expect(errors).toHaveLength(0);
   });

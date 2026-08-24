@@ -1,7 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import { db, logger, opClient } from "@server/index";
 import { workerStats } from "@server/schema/workerStats";
-import { eq, lt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { workers as workersSchema } from "@server/schema/workers";
 import { createHash } from "node:crypto";
 import {
@@ -276,18 +276,6 @@ export function sendToWorker(
       }),
     );
   });
-}
-
-export async function cleanupUncWorkerSttas(): Promise<void> {
-  const cutoff = new Date(Date.now() - 10 * 60 * 1000);
-  const rows = await db
-    .delete(workerStats)
-    .where(lt(workerStats.lastHit, cutoff))
-    .returning({ id: workerStats.id });
-  if (rows.length > 0)
-    logger.info("cleaned up unc worker stats", {
-      count: rows.length,
-    });
 }
 
 export function resolveJob(

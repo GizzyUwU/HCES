@@ -1,48 +1,47 @@
-import axios, { type AxiosInstance } from "axios";
 import { logger as LogType } from "@server/index.ts";
 import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import { SDTypes } from "./types";
-// import { Compatability } from "../compatibility/";
-import t from "typebox";
+import { type Static } from "elysia";
+import TurndownService from "turndown";
 const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
+const turndown = new TurndownService({
+  headingStyle: "atx",
+  codeBlockStyle: "fenced",
+});
+
+turndown.addRule("stripAnchors", {
+  filter: (node) => node.nodeName === "A" && node.classList.contains("anchor"),
+  replacement: () => "",
+});
+
+turndown.addRule("slackEmoji", {
+  filter: (node) =>
+    node.nodeName === "IMG" && node.classList.contains("slack-emote"),
+  replacement: (_content, node) => {
+    const alt = (node as HTMLImageElement)!.getAttribute("alt") ?? "";
+    return alt;
+  },
+});
 
 export default class Stardance {
   lastCode: number | null = null;
-  private fetch: AxiosInstance;
   private ready: Promise<void>;
   private logger: typeof LogType;
   private keySet: boolean = false;
   private cookie: string = "";
   public updatedCookie: string | undefined;
   static config = {
-    baseUrl: "https://stardance.hackclub.com"
-  }
+    baseUrl: "https://stardance.hackclub.com",
+  };
 
   constructor({ logger, cookie }: { logger: typeof LogType; cookie?: string }) {
     this.logger = logger;
-    this.fetch = axios.create({
-      baseURL: "https://stardance.hackclub.com",
-      headers: cookie ? { Cookie: cookie } : undefined,
-    });
     if (cookie) {
       this.keySet = true;
       this.cookie = cookie;
     }
     this.ready = Promise.resolve();
-
-    this.fetch.interceptors.response.use((res) => {
-      const setCookie = res.headers["set-cookie"];
-      if (!setCookie) return res;
-
-      for (const raw of setCookie) {
-        const match = raw.match(/^_stardance_session_4=([^;]+)/);
-        if (match) {
-          this.updatedCookie = `_stardance_session_4=${match[1]}`;
-        }
-      }
-      return res;
-    });
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
@@ -63,13 +62,13 @@ export default class Stardance {
 
   async shop(
     category?: string,
-  ): Promise<t.Static<(typeof SDTypes)["shopItems"]> | null> {
+  ): Promise<Static<(typeof SDTypes)["ShopItems"]> | null> {
     await this.ready;
     const res = await this.request(
       "/shop" +
         (category && category.length > 0 ? "/" + category : "/category/all"),
     );
-    const html = res.text();
+    const html = await res.text();
     this.lastCode = res.status;
     if (!(
       typeof html === "string" &&
@@ -106,7 +105,7 @@ export default class Stardance {
   private async goiReviewerLb(
     $: CheerioAPI,
     rows: Element[],
-  ): Promise<t.Static<(typeof SDTypes)["goiStats"]>["reviewerLb"]> {
+  ): Promise<Static<(typeof SDTypes)["GoiStats"]>["reviewerLb"]> {
     return rows.map((bRow) => {
       const row = $(bRow);
       const cells = row.find("td");
@@ -131,7 +130,7 @@ export default class Stardance {
 
   private async goiReviewerGraph(
     $: CheerioAPI,
-  ): Promise<t.Static<(typeof SDTypes)["goiStats"]>["graph"]> {
+  ): Promise<Static<(typeof SDTypes)["GoiStats"]>["graph"]> {
     const graph = $(".ysws-dashboard__chart");
     const rawGraph = graph.attr(
       "data-certification--ysws--reviewer-chart-chart-value",
@@ -172,7 +171,7 @@ export default class Stardance {
 
   private async goiPersonalStats(
     $: CheerioAPI,
-  ): Promise<t.Static<(typeof SDTypes)["goiStats"]>["personalStats"]> {
+  ): Promise<Static<(typeof SDTypes)["GoiStats"]>["personalStats"]> {
     const container = $(".ysws-dashboard__progress-stats");
     const stats = container.find(".ysws-dashboard__progress-stat").toArray();
     let certifiedHours = 0,
@@ -257,7 +256,7 @@ export default class Stardance {
     };
   }
 
-  async goiStats(): Promise<t.Static<(typeof SDTypes)["goiStats"]> | null> {
+  async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
     const start = performance.now();
@@ -322,13 +321,93 @@ export default class Stardance {
     }
   }
 
+  private async getDevlogs(
+    $: CheerioAPI,
+    devlogId?: Static<(typeof SDTypes)["DevlogParams"]>["devlogId"]
+  ): Promise<Static<(typeof SDTypes)["Project"]>["devlogs"]> {
+    const feed = $(".project-show__feed");
+    if (!feed.is("section")) return [];
+    const devlogs = feed.find(
+      '> article[data-feed-engagement-post-type-value="Post::Devlog"]',
+    );
+
+    return devlogs
+      .map((_, el) => {
+        const article = $(el);
+        const id = parseNum(
+          article.attr("data-feed-engagement-post-id-value") ?? "0",
+        );
+        if (devlogId && id !== devlogId) return null;
+        const durationText = article.find(".feed-post-card__duration").text();
+        const hours = Number(durationText.match(/(\d+)h/)?.[1] ?? 0);
+        const minutes = Number(durationText.match(/(\d+)m/)?.[1] ?? 0);
+        const seconds = Number(durationText.match(/(\d+)s/)?.[1] ?? 0);
+        const body = article.find(".feed-post-card__body");
+        const imageUrls = article
+          .find(".feed-post-card__media-viewport .feed-post-card__image")
+          .map((_, img) => {
+            const image = $(img);
+            return {
+              alt: image.attr("alt") ?? "",
+              src: image.attr("src") ?? "",
+            };
+          });
+        let totalComments = 0,
+          totalReposts = 0,
+          totalLikes = 0,
+          totalViews = 0;
+        for (const bEl of article
+          .find(".feed-post-card__actions")
+          .children()
+          .toArray()) {
+          const action = $(bEl);
+          switch (true) {
+            case action.hasClass("feed-post-card__comment-action"):
+              totalComments = parseNum(
+                action.find("span[id^='comments_count_']").text(),
+              );
+              break;
+            case action.hasClass("feed-post-card__repost"):
+              totalReposts = parseNum(
+                action.find("summary span").first().text(),
+              );
+              break;
+            case action.hasClass("feed-post-card__like"):
+              totalLikes = parseNum(action.find(".like-button__count").text());
+              break;
+            case (action.attr("aria-label") ?? "").startsWith("Seen by"):
+              totalViews = parseNum(action.find("span").last().text());
+              break;
+            default:
+              break;
+          }
+        }
+        return {
+          id,
+          posted: new Date(
+            article.find(".feed-post-card__time").attr("datetime") ?? "",
+          ),
+          timeLogged: `PT${hours}H${minutes}M${seconds}S`,
+          description: body.hasClass("markdown-content")
+            ? turndown.turndown(body.html() ?? "").trim()
+            : body.text().trim(),
+          imageUrls: imageUrls.get(),
+          totalComments,
+          totalReposts,
+          totalLikes,
+          totalViews,
+        };
+      })
+      .get();
+  }
+
   async project(
-    data: t.Static<(typeof SDTypes)["projectParams"]>,
-  ): Promise<Partial<t.Static<(typeof SDTypes)["project"]> | null>> {
+    data: Static<(typeof SDTypes)["ProjectParams"]>,
+  ): Promise<Static<(typeof SDTypes)["Project"]> | null> {
     await this.ready;
     try {
       const res = await this.request("/projects/" + data.id);
-      const html = res.text();
+      const html = await res.text();
       this.lastCode = res.status;
       if (!(
         typeof html === "string" &&
@@ -375,17 +454,27 @@ export default class Stardance {
         switch (label) {
           case "Devlogs": {
             totalDevlogs = val;
-            return;
+            break;
           }
           case "Total hours": {
             totalHrsInMinutes = val * 60;
-            return;
+            break;
           }
           default:
-            return;
+            break;
         }
       });
-
+      const totalHours = Math.floor(totalHrsInMinutes / 60);
+      const remainingMinutes = totalHrsInMinutes % 60;
+      const totalDuration = `PT${totalHours}H${remainingMinutes}M`;
+      const superStarBadge = projectShowPanel
+        .find(".project-show__badge.project-show__badge--fire")
+        .text();
+      const isSuperStarred =
+        superStarBadge && superStarBadge.includes("⭐ Super Star Project")
+          ? true
+          : false;
+      const devlogs = await this.getDevlogs($);
       return {
         name,
         description,
@@ -394,10 +483,46 @@ export default class Stardance {
           pfp: makerPFP,
           name: makerName,
         },
+        isSuperStarred,
         totalDevlogs,
-        totalMinutes: totalHrsInMinutes,
+        totalDuration,
         followers: totalFollowers,
+        devlogs,
       };
+    } catch (err: any) {
+      return null;
+    }
+  }
+
+  async devlogs(
+    data: Static<(typeof SDTypes)["DevlogParams"]>,
+  ): Promise<Static<(typeof SDTypes)["Project"]>["devlogs"] | null> {
+    await this.ready;
+    try {
+      const res = await this.request("/projects/" + data.id);
+      const html = await res.text();
+      this.lastCode = res.status;
+      if (!(
+        typeof html === "string" &&
+        (
+          String(res.headers.get("content-type")) ??
+          String(res.headers.get("Content-Type")) ??
+          ""
+        ).includes("text/html")
+      )) {
+        this.logger.warn("Project endpoint didn't return HTML trying to get devlogs", {
+          contentType:
+            String(res.headers.get("Content-Type")) ??
+            String(res.headers.get("Content-Type")) ??
+            "",
+          status: res.status,
+          projectId: data.id,
+        });
+        return null;
+      }
+      const $ = load(html);
+      const devlogs = await this.getDevlogs($, data.devlogId);
+      return devlogs;
     } catch (err: any) {
       return null;
     }

@@ -37,16 +37,17 @@ export function websocketHandler(app: Elysia) {
     );
   }
 
-  return new Channel("/ws", "wsAPI")
+  return new Channel("/api/v1/ws", "wsAPI")
     .headers(
       z.object({
         authorization: z.string(),
       }),
     )
-    .resolve(async ({ request }) => {
-      const bearer = request.headers["authorization"].startsWith("Bearer ")
-        ? request.headers["authorization"].slice(7)
+    .beforeUpgrade(async ({ headers }) => {
+      const bearer = headers["authorization"].startsWith("Bearer ")
+        ? headers["authorization"].slice(7)
         : undefined;
+      console.log(bearer)
       if (!bearer) throw new RpcError("UNAUTHENTICATED", "missing api key");
       const hash = createHash("sha256").update(bearer).digest("hex");
       const [keyData] = await db
@@ -65,6 +66,7 @@ export function websocketHandler(app: Elysia) {
     })
     .onOpen(({ ws }) => {
       ws.subscribe(ws.id);
+      console.log("Connection opened")
       pingTimeout(ws.id, () => {
         clearSubs(ws.id);
         ws.close();
@@ -72,6 +74,8 @@ export function websocketHandler(app: Elysia) {
     })
     .onClose(({ ws }) => {
       clearSubs(ws.id);
+      console.log("Connection closed")
+      
       const t = pingTimeouts.get(ws.id);
       if (t) clearTimeout(t);
       pingTimeouts.delete(ws.id);
@@ -94,6 +98,8 @@ export function websocketHandler(app: Elysia) {
     .clientMessage(
       "i_want_to",
       ({ ws }) => {
+        console.log("Connection cheesed")
+        
         pingTimeout(ws.id, () => {
           clearSubs(ws.id);
           ws.close();
@@ -107,6 +113,7 @@ export function websocketHandler(app: Elysia) {
       async ({ ws, message }) => {
         const key = ws.id + ":" + message.id;
         const run = async () => {
+          console.log(message)
           const req = new Request("http://internal" + message.path, {
             headers: {
               ...(message.headers ?? {}),
