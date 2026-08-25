@@ -1,13 +1,10 @@
-import { db, logger } from "@server/index";
+import { logger } from "@server/index";
 import Elysia from "elysia";
 import { z } from "zod";
 import { createHash } from "crypto";
-import {
-  Channel,
-  RpcError,
-} from "ws-asyncapi";
-import { apiKeys } from "@server/schema/apiKeys";
-import { eq } from "drizzle-orm";
+import { Channel } from "ws-asyncapi";
+import { APIError } from "./error";
+import { getApiKey } from "./apiKeyCache";
 const intervals = new Map<string, ReturnType<typeof setInterval>>();
 const pingTimeouts = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -26,6 +23,7 @@ function pingTimeout(connId: string, onTimeout: () => void) {
   pingTimeouts.set(connId, setTimeout(onTimeout, 3 * 60 * 1000));
 }
 
+
 export function websocketHandler(app: Elysia) {
   const supportedPaths = app.routes
     .map((r) => r.path)
@@ -37,6 +35,13 @@ export function websocketHandler(app: Elysia) {
     );
   }
 
+  const routePatterns = supportedPaths.map((pattern) => ({
+    pattern,
+    regex: new RegExp(
+      "^" + pattern.replace(/:[^/]+/g, "[^/]+").replace(/\//g, "\\/") + "$",
+    ),
+  }));
+
   return new Channel("/api/v1/ws", "wsAPI")
     .headers(
       z.object({
@@ -47,26 +52,25 @@ export function websocketHandler(app: Elysia) {
       const bearer = headers["authorization"].startsWith("Bearer ")
         ? headers["authorization"].slice(7)
         : undefined;
-      console.log(bearer)
-      if (!bearer) throw new RpcError("UNAUTHENTICATED", "missing api key");
+      if (!bearer)
+        throw new APIError({
+          status: 401,
+          msg: "Missing an API Key",
+        });
       const hash = createHash("sha256").update(bearer).digest("hex");
-      const [keyData] = await db
-        .select()
-        .from(apiKeys)
-        .where(eq(apiKeys.keyHash, hash));
+      const keyData=  await getApiKey(hash)
       if (!keyData || Object.keys(keyData).length === 0)
-        throw new RpcError("UNAUTHENTICATED", "invalid api key");
-      db.update(apiKeys)
-        .set({ lastUsed: new Date() })
-        .where(eq(apiKeys.id, keyData.id))
-        .catch((err) => logger.error("failed to update lastUsed", { err }));
+        throw new APIError({
+          status: 401,
+          msg: "Unauthorised",
+        });
       return {
         keyData: keyData,
       };
     })
     .onOpen(({ ws }) => {
       ws.subscribe(ws.id);
-      console.log("Connection opened")
+      console.log("Connection opened");
       pingTimeout(ws.id, () => {
         clearSubs(ws.id);
         ws.close();
@@ -74,8 +78,8 @@ export function websocketHandler(app: Elysia) {
     })
     .onClose(({ ws }) => {
       clearSubs(ws.id);
-      console.log("Connection closed")
-      
+      console.log("Connection closed");
+
       const t = pingTimeouts.get(ws.id);
       if (t) clearTimeout(t);
       pingTimeouts.delete(ws.id);
@@ -98,8 +102,8 @@ export function websocketHandler(app: Elysia) {
     .clientMessage(
       "i_want_to",
       ({ ws }) => {
-        console.log("Connection cheesed")
-        
+        console.log("Connection cheesed");
+
         pingTimeout(ws.id, () => {
           clearSubs(ws.id);
           ws.close();
@@ -110,13 +114,22 @@ export function websocketHandler(app: Elysia) {
     )
     .clientMessage(
       "start",
-      async ({ ws, message }) => {
+      async ({ ws, message, request }) => {
         const key = ws.id + ":" + message.id;
+        if (!routePatterns.find(({ regex }) => regex.test(message.path))) {
+          ws.publish(ws.id, "result", {
+            id: message.id,
+            status: 404,
+            data: { error: `Unknown path "${message.path}"` },
+          });
+          return;
+        }
         const run = async () => {
-          console.log(message)
+          console.log(message);
           const req = new Request("http://internal" + message.path, {
             headers: {
               ...(message.headers ?? {}),
+              authorization: request.headers["authorization"],
               "x-hces-worker-internal": "1",
             },
           });
@@ -138,15 +151,8 @@ export function websocketHandler(app: Elysia) {
       },
       z.object({
         id: z.string(),
-        path: z.union(
-          app.routes
-            .map((r) => r.path)
-            .filter(
-              (p) => p.startsWith("/api/v1") && !p.includes("/api/v1/web"),
-            )
-            .map((p) => z.literal(p)),
-        ),
-        headers: z.record(z.string(), z.string()).optional(),
+        path: z.string().describe("See /api/v1/docs for all paths to provide here"),
+        headers: z.record(z.string(), z.string()).describe("Used for auth set for some scrapers and that").optional(),
         intervalMs: z.number().optional(),
       }),
     )

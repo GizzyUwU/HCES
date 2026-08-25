@@ -17,6 +17,7 @@ import { websocketHandler } from "./lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 import { startRemoteWorker } from "./lib/worker/workerRuntime";
+import { cors } from "@elysia/cors"
 import {
   enableLocalWorker,
   resetStaleConnections,
@@ -189,6 +190,13 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     .use(auth)
     .use(routes)
     .use(workerChannel)
+    .use(cors({
+      origin: true,
+      methods: "*",
+      allowedHeaders: "*",
+      exposeHeaders: "*",
+      credentials: false
+    }))
     .use(
       openapi({
         path: "/api/v1/docs",

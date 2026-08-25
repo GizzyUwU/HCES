@@ -7,6 +7,7 @@ import { createSelectSchema } from "drizzle-typebox";
 import { createHash, randomBytes } from "node:crypto";
 import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
+import { invalidateApiKey, updateCacheApiKey } from "@server/lib/apiKeyCache";
 const _apiKeys = createSelectSchema(tables.apiKeys);
 
 function genAPIKey() {
@@ -175,6 +176,7 @@ export default new Elysia()
             msg: "apikey_update_failed",
           });
         }
+        updateCacheApiKey(updatedKey)
         return updatedKey;
       } catch (err) {
         logger.error("Updating API Key threw an error", {
@@ -219,6 +221,7 @@ export default new Elysia()
             and(eq(tables.apiKeys.userId, user.id), eq(tables.apiKeys.id, id)),
           );
 
+        invalidateApiKey(id)
         return {
           ok: true,
         };
