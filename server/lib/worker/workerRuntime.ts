@@ -3,6 +3,7 @@ import { logger } from "@server/index";
 export type JobMessage = {
   type: "job";
   id: string;
+  workerId: string;
   path: string;
   headers?: Record<string, string>;
 };
@@ -14,22 +15,23 @@ export type HandleJobResult = {
   data: unknown;
   bytes: number;
   headers: Record<string, string>;
-}
+};
 
 export async function handleJob(msg: JobMessage, send: (data: string) => void) {
   try {
     const app = await workerApp();
     const scopedPath = msg.path.startsWith("/api/v1")
-       ? msg.path.slice("/api/v1".length) || "/"
-       : msg.path;
+      ? msg.path.slice("/api/v1".length) || "/"
+      : msg.path;
     const req = new Request("http://internal" + scopedPath, {
       headers: {
         ...(msg.headers ?? {}),
         "x-hces-worker-internal": "1",
+        "x-hces-worker-id": msg.workerId,
       },
     });
     const res = await app.handle(req);
-    const data = await res.json().catch(() => null) as HandleJobResult;
+    const data = (await res.json().catch(() => null)) as HandleJobResult;
     const bytes = Buffer.byteLength(JSON.stringify(data ?? null), "utf-8");
     const responseHeaders: Record<string, string> = {};
     res.headers.forEach((value, key) => {
@@ -43,7 +45,8 @@ export async function handleJob(msg: JobMessage, send: (data: string) => void) {
         status: res.status,
         data,
         bytes,
-        headers: Object.keys(responseHeaders).length > 0 ? responseHeaders : undefined,
+        headers:
+          Object.keys(responseHeaders).length > 0 ? responseHeaders : undefined,
       }),
     );
   } catch (err) {

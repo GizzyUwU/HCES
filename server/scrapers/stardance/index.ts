@@ -1,4 +1,4 @@
-import { logger as LogType } from "@server/index.ts";
+import { logger as LogType, opClient } from "@server/index.ts";
 import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import { SDTypes } from "./types";
@@ -29,14 +29,16 @@ export default class Stardance {
   private ready: Promise<void>;
   private logger: typeof LogType;
   private keySet: boolean = false;
+  private workerId: string | null = null;
   private cookie: string = "";
   public updatedCookie: string | undefined;
   static config = {
     baseUrl: "https://stardance.hackclub.com",
   };
 
-  constructor({ logger, cookie }: { logger: typeof LogType; cookie?: string }) {
+  constructor({ logger, cookie, workerId }: { logger: typeof LogType; cookie?: string; workerId?: string }) {
     this.logger = logger;
+    this.workerId = workerId ?? null;
     if (cookie) {
       this.keySet = true;
       this.cookie = cookie;
@@ -47,10 +49,27 @@ export default class Stardance {
   private async request(path: string, init?: RequestInit): Promise<Response> {
     const headers = new Headers(init?.headers);
     if (this.cookie) headers.set("Cookie", this.cookie);
+    const before = performance.now()
     const res = await fetch("https://stardance.hackclub.com" + path, {
       ...init,
       headers,
     });
+    if (opClient && this.workerId) {
+      const now = performance.now();
+      opClient.identify({
+        profileId: "stardance",
+        properties: {
+          path,
+          workerId: this.workerId,
+          status: res.status,
+          latencyMs: Math.round(now - before),
+          dev: process.env["DEV"] ?? false,
+        },
+      });
+  
+      await opClient.track("scraper_latency");
+      opClient.clear();
+    }
     this.lastCode = res.status;
     for (const cookie of res.headers.getSetCookie()) {
       if (cookie.startsWith("_stardance_session_4=")) {

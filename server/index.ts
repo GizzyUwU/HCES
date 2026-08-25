@@ -17,7 +17,8 @@ import { websocketHandler } from "./lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
 import { startRemoteWorker } from "./lib/worker/workerRuntime";
-import { cors } from "@elysia/cors"
+import { cors } from "@elysia/cors";
+import prometheusRegistry from "@server/lib/metrics";
 import {
   enableLocalWorker,
   resetStaleConnections,
@@ -27,6 +28,7 @@ import { OpenPanel } from "@openpanel/sdk";
 import { Pool } from "pg";
 import { preconnectScrapers } from "./scrapers/preconnect";
 import { join } from "node:path";
+import { Registry } from "prom-client";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -125,7 +127,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       console.log(`Worker is running on ${url}`),
     );
 
-  preconnectScrapers()
+  preconnectScrapers();
 } else {
   const { auth } = await import("./lib/auth");
   db = drizzle({
@@ -133,7 +135,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       connectionString: process.env.DATABASE_URL!,
       max: Number(process.env["DB_POOL_MAX"]) || 20,
       idleTimeoutMillis: 30 * 1000,
-      connectionTimeoutMillis: 5 * 1000
+      connectionTimeoutMillis: 5 * 1000,
     }),
   });
   await resetStaleConnections();
@@ -144,7 +146,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     logLevel: LogLevel.Default,
   });
   const baseApp = new Elysia({
-     websocket: { publishToSelf: true },
+    websocket: { publishToSelf: true },
   })
     .use(
       elysiaLogger({
@@ -166,6 +168,10 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         },
       }),
     )
+    .get("/metrics", async ({ set }) => {
+      set.headers["content-type"] = prometheusRegistry.contentType;
+      return prometheusRegistry.metrics();
+    })
     .onError(async ({ error, set, cookie }) => {
       if (error instanceof UnverifiedAccountError) {
         const sessionId = cookie["sid"]?.value;
@@ -190,13 +196,15 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     .use(auth)
     .use(routes)
     .use(workerChannel)
-    .use(cors({
-      origin: true,
-      methods: "*",
-      allowedHeaders: "*",
-      exposeHeaders: "*",
-      credentials: false
-    }))
+    .use(
+      cors({
+        origin: true,
+        methods: "*",
+        allowedHeaders: "*",
+        exposeHeaders: "*",
+        credentials: false,
+      }),
+    )
     .use(
       openapi({
         path: "/api/v1/docs",
@@ -204,8 +212,8 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         scalar: {
           url: "/api/v1/docs.json",
           metaData: {
-            title: 'HCES Docs',
-          }
+            title: "HCES Docs",
+          },
         },
       }),
     )
@@ -289,7 +297,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     );
 
   if (process.env["WORKER"]) {
-    preconnectScrapers()
+    preconnectScrapers();
     enableLocalWorker(
       process.env["WORKER_KEY"]!,
       process.env["GIT_COMMIT_SHA"] || "1"!,
@@ -302,7 +310,11 @@ console.warn = (...args: unknown[]) => {
   const text = args
     .map((a) => (a instanceof Error ? a.message : String(a)))
     .join(" ");
-  if (text.includes("[exact-mirror] TypeBox's TypeCompiler is required to use Union")) {
+  if (
+    text.includes(
+      "[exact-mirror] TypeBox's TypeCompiler is required to use Union",
+    )
+  ) {
     return;
   }
   rawConsoleWarn(...args);

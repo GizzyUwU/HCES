@@ -1,5 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
 import { db, logger, opClient } from "@server/index";
+import prometheusRegistry from "../metrics";
 import { workerStats } from "@server/schema/workerStats";
 import { eq } from "drizzle-orm";
 import { workers as workersSchema } from "@server/schema/workers";
@@ -9,6 +10,49 @@ import {
   type HandleJobResult,
   type JobMessage,
 } from "./workerRuntime";
+import { Counter, Gauge, Histogram } from "prom-client";
+const workerCompletions = new Counter({
+  name: "worker_completions_total",
+  help: "Total num of completed jobs",
+  labelNames: ["scraper", "path", "worker_id", "dev"],
+  registers: [prometheusRegistry]
+});
+
+const workerBytes = new Counter({
+  name: "worker_bytes_total",
+  help: "Total num of bytes returned by workers",
+  labelNames: ["scraper", "path", "worker_id", "dev"],
+  registers: [prometheusRegistry]
+});
+
+const workerLatency = new Histogram({
+  name: "worker_latency_seconds",
+  help: "Worker latency in seconds",
+  labelNames: ["scraper", "path", "worker_id", "dev"],
+  buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 15],
+  registers: [prometheusRegistry]
+});
+
+const workerDispatches = new Counter({
+  name: "worker_dispatches_total",
+  help: "Total num of bytes returned by workers",
+  labelNames: ["scraper", "path", "worker_id", "dev"],
+  registers: [prometheusRegistry]
+});
+
+const workerErrors = new Counter({
+  name: "worker_errors_total",
+  help: "Total num of worker errors",
+  labelNames: ["worker_id", "error", "dev"],
+  registers: [prometheusRegistry]
+
+});
+
+const connectedWorkers = new Gauge({
+  name: "workers_connected",
+  help: "Num of connected workers atm"
+})
+
 const workers = new Map<
   string,
   {
@@ -130,6 +174,7 @@ function candidateIds(): string[] {
 
 export function registerWorker(id: string, send: (data: string) => void) {
   workers.set(id, { id, send });
+  connectedWorkers.set(workers.size)
   if (id !== localWorker) {
     logger.info("Worker connected", {
       id,
@@ -141,6 +186,7 @@ export function registerWorker(id: string, send: (data: string) => void) {
 
 export function unregisterWorker(id: string) {
   workers.delete(id);
+  connectedWorkers.set(workers.size)
   db.update(workersSchema)
     .set({
       connected: false,
@@ -160,7 +206,9 @@ function scraperNameFromPath(path: string): string {
   return paths[2] ?? path;
 }
 
-export async function pickWorker(path: string): Promise<{ scraper: string; workerId: string | null } | null> {
+export async function pickWorker(
+  path: string,
+): Promise<{ scraper: string; workerId: string | null } | null> {
   const candidates = candidateIds();
   if (candidates.length === 0) return null;
   const scraper = scraperNameFromPath(path);
@@ -187,21 +235,33 @@ const pendingDispatches = new Map<string, Promise<unknown>>();
 
 export function recordDispatch(workerId: string, path: string): string {
   const id = createId();
+  const scraper = scraperNameFromPath(path);
+  workerDispatches.inc({
+    scraper,
+    path,
+    worker_id: workerId,
+    dev: String(process.env["DEV"] ?? false)
+  })
   const insert = db
     .insert(workerStats)
     .values({
       id,
       workerId: workerId,
-      scraper: scraperNameFromPath(path),
+      scraper
     })
     .catch((err) => {
+      workerErrors.inc({
+        worker_id: workerId,
+        error: "db_insert",
+        dev: String(process.env["DEV"] ?? false)
+      })
       logger.error("failed to record dispatch", { err });
     })
     .finally(() => {
       pendingDispatches.delete(id);
     });
   pendingDispatches.set(id, insert);
-  return workerId
+  return workerId;
 }
 
 export async function recordCompletion(
@@ -214,21 +274,15 @@ export async function recordCompletion(
 ): Promise<void> {
   await pendingDispatches.get(rowId);
   getStat(scraper, workerId).latencies.push({ at: Date.now(), ms: latencyMs });
-  if (opClient) {
-    opClient.identify({
-      profileId: rowId,
-      properties: {
-        bytes,
-        scraper,
-        path,
-        latencyMs,
-        dev: process.env["DEV"] ?? false,
-      },
-    });
-
-    await opClient.track("workers");
-    opClient.clear();
+  const labels = {
+    scraper,
+    worker_id: workerId,
+    path,
+    dev: process.env["DEV"] ?? "false"
   }
+  workerCompletions.inc(labels);
+  workerBytes.inc(labels, bytes);
+  workerLatency.observe(labels, latencyMs / 1000)
 }
 
 export async function resetStaleConnections(): Promise<void> {
@@ -242,6 +296,8 @@ export async function resetStaleConnections(): Promise<void> {
       count: rows.length,
     });
   }
+
+  connectedWorkers.set(workers.size)
 }
 
 export function sendToWorker(
@@ -255,11 +311,23 @@ export function sendToWorker(
   headers?: Record<string, string>;
 }> {
   const worker = workers.get(workerId);
-  if (!worker) return Promise.reject(new Error("worker_not_connected"));
+  if (!worker) {
+    workerErrors.inc({
+      worker_id: workerId,
+      error: "worker_not_connected",
+      dev: String(process.env["DEV"] ?? false)
+    })
+    return Promise.reject(new Error("worker_not_connected"));
+  }
   const id = createId();
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       pending.delete(id);
+      workerErrors.inc({
+        worker_id: workerId,
+        error: "worker_timeout",
+        dev: String(process.env["DEV"] ?? false)
+      })
       reject(new Error("worker_timeout"));
     }, 15 * 1000);
     pending.set(id, {
@@ -271,6 +339,7 @@ export function sendToWorker(
       JSON.stringify({
         type: "job",
         id,
+        workerId,
         path,
         headers: {
           ...headers,
