@@ -172,7 +172,9 @@ export async function pickWorker(path: string): Promise<{ scraper: string; worke
     const s = getStat(scraper, id);
     prune(s, now);
     const hits = s.hits.length;
-    const latency = s.latencies.length;
+    const latency = s.latencies.length
+      ? s.latencies.reduce((sum, l) => sum + l.ms, 0) / s.latencies.length
+      : 0;
     if (hits < bestHits || (hits === bestHits && latency < bestLatency))
       ((best = id), (bestHits = hits), (bestLatency = latency));
   }
@@ -199,18 +201,19 @@ export function recordDispatch(workerId: string, path: string): string {
       pendingDispatches.delete(id);
     });
   pendingDispatches.set(id, insert);
-  return id;
+  return workerId
 }
 
 export async function recordCompletion(
   scraper: string,
   path: string,
+  workerId: string,
   rowId: string,
   latencyMs: number,
   bytes: number,
 ): Promise<void> {
   await pendingDispatches.get(rowId);
-  getStat(scraper, rowId).latencies.push({ at: Date.now(), ms: latencyMs });
+  getStat(scraper, workerId).latencies.push({ at: Date.now(), ms: latencyMs });
   if (opClient) {
     opClient.identify({
       profileId: rowId,

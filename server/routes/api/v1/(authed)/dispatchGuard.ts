@@ -10,7 +10,7 @@ import {
 
 const localDispatches = new WeakMap<
   Request,
-  { scraper: string; path: string; rowId: string; startedAt: number }
+  { scraper: string; path: string; workerId: string; rowId: string; startedAt: number }
 >();
 
 function jsonResponse(
@@ -51,6 +51,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         localDispatches.set(request, {
           scraper,
           path,
+          workerId,
           rowId,
           startedAt,
         });
@@ -67,6 +68,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         recordCompletion(
           scraper,
           path,
+          workerId,
           rowId,
           Math.round(performance.now() - startedAt),
           result.bytes,
@@ -77,6 +79,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         recordCompletion(
           scraper,
           path,
+          workerId,
           rowId,
           Math.round(performance.now() - startedAt),
           0,
@@ -86,17 +89,18 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
         });
       }
     })
-    .onAfterHandle(({ request, response }) => {
+    .onAfterHandle(({ request, responseValue }) => {
       const dispatched = localDispatches.get(request);
       if (!dispatched) return;
       localDispatches.delete(request);
       const bytes = Buffer.byteLength(
-        JSON.stringify(response ?? null),
+        JSON.stringify(responseValue ?? null),
         "utf-8",
       );
       recordCompletion(
         dispatched.scraper,
         dispatched.path,
+        dispatched.workerId,
         dispatched.rowId,
         Math.round(performance.now() - dispatched.startedAt),
         bytes,
