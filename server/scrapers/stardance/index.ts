@@ -1,9 +1,11 @@
-import { logger as LogType, opClient } from "@server/index.ts";
+import { logger as LogType } from "@server/index.ts";
+import prometheusRegistry from "@server/lib/metrics";
 import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import { SDTypes } from "./types";
 import { type Static } from "elysia";
 import TurndownService from "turndown";
+import { Histogram } from "prom-client";
 const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -14,7 +16,6 @@ turndown.addRule("stripAnchors", {
   filter: (node) => node.nodeName === "A" && node.classList.contains("anchor"),
   replacement: () => "",
 });
-
 turndown.addRule("slackEmoji", {
   filter: (node) =>
     node.nodeName === "IMG" && node.classList.contains("slack-emote"),
@@ -22,6 +23,26 @@ turndown.addRule("slackEmoji", {
     const alt = (node as HTMLImageElement)!.getAttribute("alt") ?? "";
     return alt;
   },
+});
+
+const stardanceRequestDuration = new Histogram({
+  name: "stardance_request_duration_seconds",
+  help: "Duration of requests to Stardance in seconds",
+  labelNames: ["path", "status", "worker_id"],
+  buckets: [
+    0.01,
+    0.025,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
+    1,
+    2.5,
+    5,
+    10,
+    30,
+  ],
+  registers: [prometheusRegistry],
 });
 
 export default class Stardance {
@@ -54,21 +75,16 @@ export default class Stardance {
       ...init,
       headers,
     });
-    if (opClient && this.workerId) {
-      const now = performance.now();
-      opClient.identify({
-        profileId: "stardance",
-        properties: {
+    if (this.workerId) {
+      console.log("aaaaa")
+      stardanceRequestDuration.observe(
+        {
           path,
-          workerId: this.workerId,
-          status: res.status,
-          latencyMs: Math.round(now - before),
-          dev: process.env["DEV"] ?? false,
+          status: String(res.status),
+          worker_id: this.workerId
         },
-      });
-  
-      await opClient.track("scraper_latency");
-      opClient.clear();
+        (performance.now() - before) / 1000,
+      );
     }
     this.lastCode = res.status;
     for (const cookie of res.headers.getSetCookie()) {

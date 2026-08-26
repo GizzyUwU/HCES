@@ -6,7 +6,6 @@ import { workers } from "@server/schema/workers";
 import { APIError } from "../error";
 import bearer from "@elysia/bearer";
 import { eq } from "drizzle-orm";
-
 const lastCheese = new Map<string, number>();
 const iWantToTimers = new Map<string, ReturnType<typeof setInterval>>();
 const sockets = new Map<string, { close: () => void }>();

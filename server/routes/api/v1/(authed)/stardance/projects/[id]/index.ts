@@ -12,11 +12,13 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
         cookie = "_stardance_session_4=" + cookie;
+      console.log(headers)
       const client = new Stardance({
         logger,
         cookie,
         workerId: headers["x-hces-worker-id"] ?? "",
       });
+      console.log(headers["x-hces-worker-id"], "aaa")
       const res = await client.project(params);
       if (!res)
         throw new APIError({

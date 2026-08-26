@@ -28,7 +28,7 @@ import { OpenPanel } from "@openpanel/sdk";
 import { Pool } from "pg";
 import { preconnectScrapers } from "./scrapers/preconnect";
 import { join } from "node:path";
-import { Registry } from "prom-client";
+import { Counter, Histogram } from "prom-client";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -139,15 +139,82 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     }),
   });
   await resetStaleConnections();
+  const requestStartTimes = new WeakMap<Request, number>();
+  const httpRequests = new Counter({
+    name: "http_requests_total",
+    help: "Total num of requests",
+    labelNames: ["method", "path", "status"],
+    registers: [prometheusRegistry]
+  });
+  const httpRequestDuration = new Histogram({
+    name: "http_requests_duration",
+    help: "Duration of requests in seconds",
+    labelNames: ["method", "path", "status"],
+    buckets: [
+      0.005,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.25,
+      0.5,
+      1,
+      2.5,
+      5,
+      10,
+      30,
+    ],
+    registers: [prometheusRegistry]
+  });
+
+
+  const getClientIp = (request: Request) => {
+    if (Boolean(process.env["TRUST_X_FORWARDED_FOR"]) === true) {
+      return (
+        request.headers.get("cf-connecting-ip") ??
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+        "unknown"
+      );
+    }
+
+    return app?.server?.requestIP(request)?.address ?? "unknown";
+  };
 
   const routes = await fsr({
     dir: join(import.meta.dir, "routes"),
     filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
     logLevel: LogLevel.Default,
   });
-  const baseApp = new Elysia({
-    websocket: { publishToSelf: true },
-  })
+  const baseApp = new Elysia()
+    .onRequest(({
+      request,
+    }) => {
+      requestStartTimes.set(request, performance.now());
+      logger.info(`HTTP - ${request.method} - ${getClientIp(request)} - ${request.url}`, {
+        ip: getClientIp(request),
+        method: request.method,
+        url: request.url
+      })
+    })
+    .onAfterHandle(({
+      request,
+      set,
+      route
+    }) => {
+      const start = requestStartTimes.get(request);
+      if (!start) return;
+      const duration = (performance.now() - start) / 1000;
+      httpRequests.inc({
+        method: request.method,
+        path: route,
+        status: set.status ?? 200
+      })
+      httpRequestDuration.observe({
+        method: request.method,
+        path: route,
+        status: set.status ?? 200
+      }, duration)
+    })
     .use(
       elysiaLogger({
         category: ["hces"],

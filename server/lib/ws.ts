@@ -23,7 +23,6 @@ function pingTimeout(connId: string, onTimeout: () => void) {
   pingTimeouts.set(connId, setTimeout(onTimeout, 3 * 60 * 1000));
 }
 
-
 export function websocketHandler(app: Elysia) {
   const supportedPaths = app.routes
     .map((r) => r.path)
