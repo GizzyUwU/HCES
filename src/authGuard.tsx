@@ -106,6 +106,18 @@ const AuthGuard: ParentComponent = (props) => {
           </div>
           <button
             class="no-underline text-white hover:text-secondary-dark ml-auto mr-3 cursor-pointer"
+            onClick={() => window.location.href = "/api/v1/docs"}
+          >
+            Docs
+          </button>
+          <button
+            class="no-underline text-white hover:text-secondary-dark mr-3 cursor-pointer"
+            onClick={() => window.location.href = "/api/v1/ws/docs"}
+          >
+            WSDocs
+          </button>
+          <button
+            class="no-underline text-white hover:text-secondary-dark mr-3 cursor-pointer"
             onClick={() => logout.mutate()}
           >
             Logout

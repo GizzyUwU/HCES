@@ -6,6 +6,8 @@ export namespace SDTypes {
     description: t.String(),
     avgHours: t.String(),
     price: t.Number({ exclusiveMinimum: -Infinity }),
+    stock: Nullable(t.Number()),
+    requirements: Nullable(t.String({ description: "Requirements in order to buy the item" }))
   });
   export const ShopItems = t.Array(ShopItem);
 

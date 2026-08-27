@@ -7,7 +7,7 @@ import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
 
 export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   "",
-  async ({ set, headers, params }) => {
+  async ({ set, headers, request, params }) => {
     try {
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
@@ -15,7 +15,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
       const client = new Stardance({
         logger,
         cookie,
-        workerId: headers["x-hces-worker-id"] ?? "",
+        workerId: request.headers.get("x-hces-worker-id") ?? "",
       });
 
       const res = await client.devlogs(params);

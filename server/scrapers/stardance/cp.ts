@@ -4,6 +4,8 @@ import { type Static } from "elysia";
 import TurndownService from "turndown";
 import type { CPScraperAdapter } from "../compatibility/adapter";
 import type { CPTypes } from "../compatibility/types";
+import { Histogram } from "prom-client";
+import prometheusRegistry from "@server/lib/metrics";
 const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -24,19 +26,41 @@ turndown.addRule("slackEmoji", {
   },
 });
 
+const stardaneCompatReqDuration = new Histogram({
+  name: "stardance_compat_duration_seconds",
+  help: "Duration of requests to Stardance in compat handler in seconds",
+  labelNames: ["path", "status", "worker_id"],
+  buckets: [
+    0.01,
+    0.025,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
+    1,
+    2.5,
+    5,
+    10,
+    30,
+  ],
+  registers: [prometheusRegistry],
+})
+
 export default class Stardance implements CPScraperAdapter {
   lastCode: number | null = null;
   private ready: Promise<void>;
   private logger: typeof LogType;
   private keySet: boolean = false;
   private cookie: string = "";
+  private workerId: string | null = null;
   public updatedCookie: string | undefined;
   static config = {
     baseUrl: "https://stardance.hackclub.com",
   };
 
-  constructor({ logger, cookie }: { logger: typeof LogType; cookie?: string }) {
+  constructor({ logger, cookie, workerId }: { logger: typeof LogType; cookie?: string; workerId?: string; }) {
     this.logger = logger;
+    this.workerId = workerId ?? null;
     if (cookie) {
       this.keySet = true;
       this.cookie = cookie;
@@ -47,10 +71,18 @@ export default class Stardance implements CPScraperAdapter {
   private async request(path: string, init?: RequestInit): Promise<Response> {
     const headers = new Headers(init?.headers);
     if (this.cookie) headers.set("Cookie", this.cookie);
+    const before = performance.now()
     const res = await fetch("https://stardance.hackclub.com" + path, {
       ...init,
       headers,
     });
+    if (this.workerId) {
+      stardaneCompatReqDuration.observe({
+        path,
+        status: String(res.status),
+        worker_id: this.workerId
+      }, (performance.now() - before / 1000))
+    }
     this.lastCode = res.status;
     for (const cookie of res.headers.getSetCookie()) {
       if (cookie.startsWith("_stardance_session_4=")) {
@@ -105,7 +137,7 @@ export default class Stardance implements CPScraperAdapter {
   private async getDevlogs(
     $: CheerioAPI,
     devlogId?: Static<(typeof CPTypes)["DevlogParams"]>["devlogId"]
-  ): Promise<Static<(typeof CPTypes)["Project"]>["devlogs"]> {
+  ): Promise<Static<(typeof CPTypes)["Devlogs"]>> {
     const feed = $(".project-show__feed");
     if (!feed.is("section")) return [];
     const devlogs = feed.find(
@@ -135,7 +167,7 @@ export default class Stardance implements CPScraperAdapter {
           });
 
         return {
-          id,
+          id: String(id),
           posted: new Date(
             article.find(".feed-post-card__time").attr("datetime") ?? "",
           ),
@@ -145,6 +177,28 @@ export default class Stardance implements CPScraperAdapter {
             : body.text().trim(),
           imageUrls: imageUrls.get(),
         };
+      })
+      .get();
+  }
+
+  private async getDevlogIds(
+    $: CheerioAPI,
+    devlogId?: Static<(typeof CPTypes)["DevlogParams"]>["devlogId"]
+  ): Promise<Array<Static<(typeof CPTypes)["Devlog"]>["id"]>> {
+    const feed = $(".project-show__feed");
+    if (!feed.is("section")) return [];
+    const devlogs = feed.find(
+      '> article[data-feed-engagement-post-type-value="Post::Devlog"]',
+    );
+
+    return devlogs
+      .map((_, el) => {
+        const article = $(el);
+        const id = parseNum(
+          article.attr("data-feed-engagement-post-id-value") ?? "0",
+        );
+        if (devlogId && id !== devlogId) return null;
+        return String(id);
       })
       .get();
   }
@@ -215,7 +269,7 @@ export default class Stardance implements CPScraperAdapter {
       const totalHours = Math.floor(totalHrsInMinutes / 60);
       const remainingMinutes = totalHrsInMinutes % 60;
       const totalDuration = `PT${totalHours}H${remainingMinutes}M`;
-      const devlogs = await this.getDevlogs($);
+      const devlogIds = await this.getDevlogIds($);
       return {
         name,
         description,
@@ -227,7 +281,7 @@ export default class Stardance implements CPScraperAdapter {
         totalDevlogs,
         totalDuration,
         followers: totalFollowers,
-        devlogs,
+        devlogIds,
       };
     } catch (err: any) {
       return null;
@@ -237,7 +291,7 @@ export default class Stardance implements CPScraperAdapter {
   
   async devlogs(
     data: Static<(typeof CPTypes)["DevlogParams"]>,
-  ): Promise<Static<(typeof CPTypes)["Project"]>["devlogs"] | null> {
+  ): Promise<Static<(typeof CPTypes)["Devlogs"]> | null> {
     await this.ready;
     try {
       const res = await this.request("/projects/" + data.id);

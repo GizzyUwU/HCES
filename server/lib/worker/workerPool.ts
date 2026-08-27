@@ -147,6 +147,7 @@ export async function enableLocalWorker(key: string, versionSHA: string) {
   registerWorker(localWorker, (data) => {
     const msg = JSON.parse(data) as JobMessage;
     if (msg.type !== "job") return;
+    console.log("aaa")
     void handleJob(msg, (data) => {
       const result = JSON.parse(data) as HandleJobResult;
       resolveJob(result.id, {

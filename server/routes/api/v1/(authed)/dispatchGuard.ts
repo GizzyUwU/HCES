@@ -10,7 +10,13 @@ import {
 
 const localDispatches = new WeakMap<
   Request,
-  { scraper: string; path: string; workerId: string; rowId: string; startedAt: number }
+  {
+    scraper: string;
+    path: string;
+    workerId: string;
+    rowId: string;
+    startedAt: number;
+  }
 >();
 
 function jsonResponse(
@@ -48,6 +54,7 @@ export const dispatchGuard = (forwardHeaders: string[]) =>
       const rowId = recordDispatch(workerId, path);
       const startedAt = performance.now();
       if (isLocalWorker(workerId)) {
+        request.headers.set("x-hces-worker-id", workerId);
         localDispatches.set(request, {
           scraper,
           path,

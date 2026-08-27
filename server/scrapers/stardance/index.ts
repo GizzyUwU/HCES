@@ -76,7 +76,6 @@ export default class Stardance {
       headers,
     });
     if (this.workerId) {
-      console.log("aaaaa")
       stardanceRequestDuration.observe(
         {
           path,

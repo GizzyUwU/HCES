@@ -1,10 +1,12 @@
 import { t } from "elysia";
+import { Nullable } from "../typeUtils";
 export namespace CPTypes {
   export const ShopItem = t.Object({
     title: t.String(),
     description: t.String(),
     avgHours: t.String(),
     price: t.Number({ exclusiveMinimum: -Infinity }),
+    stock: Nullable(t.Number())
   });
   export const ShopItems = t.Array(ShopItem);
 
@@ -22,6 +24,7 @@ export namespace CPTypes {
     }),
   ]);
   export const Devlog = t.Object({
+    id: t.String(),
     posted: t.Date(),
     timeLogged: t.String({ description: "Total time of a devlog in ISO 8601 Duration"}),
     description: t.String(),
@@ -43,6 +46,6 @@ export namespace CPTypes {
     totalDevlogs: t.Number(),
     totalDuration: t.String({ description: "Total time in ISO 8601 Duration"}),
     followers: t.Number(),
-    devlogs: Devlogs,
+    devlogIds: t.Array(t.Union([t.String(), t.Number()]))
   });
 }

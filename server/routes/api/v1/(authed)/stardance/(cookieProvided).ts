@@ -5,7 +5,7 @@ import Stardance from "@server/scrapers/stardance";
 import { logger } from "@server/index";
 export const stardanceCookie = () =>
   new Elysia({ name: "stardanceCookie" })
-    .resolve(async ({ headers }) => {
+    .resolve(async ({ headers, request }) => {
       if (!headers["x-stardance-cookie"])
         throw new APIError({
           status: 401,
@@ -14,7 +14,7 @@ export const stardanceCookie = () =>
       let cookie = headers["x-stardance-cookie"];
       if (!cookie.startsWith("_stardance_session_4="))
         cookie = "_stardance_session_4=" + cookie;
-      const client = new Stardance({ logger, cookie });
+      const client = new Stardance({ logger, cookie, workerId: request.headers.get("x-hces-worker-id") ?? "" });
       return {
         stardanceCookie: cookie,
         client
