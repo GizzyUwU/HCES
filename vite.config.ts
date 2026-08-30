@@ -15,8 +15,12 @@ const viteConfig = defineConfig({
   ],
   server: {
     port: 3000,
+    host: true,
     proxy: {
-      "/api": "http://localhost:8000",
+      "/api": {
+        target: process.env["BACKEND_URL"] || "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
   build: {

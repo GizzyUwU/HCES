@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:sd": "concurrently -k -s first -n server,test -c green,blue \"bun run server/index.ts\" \"until curl -s http://localhost:8000 > /dev/null; do sleep 0.2; done; bun test sd.api.test.ts\"",
     "dev": "concurrently -n vite,server -c blue,green \"vite --host\" \"bun run --watch server/index.ts\"",
-    "worker": "bun run --watch server/index.ts"
+    "prod:frontend": "vite --host",
+    "prod:backend": "bun run server/index.ts"
   },
   "dependencies": {
     "@bogeychan/elysia-oauth2": "^0.1.0",
