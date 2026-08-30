@@ -7,7 +7,7 @@
  * OpenAPI spec version: v1
  */
 
-import { Type, type TSchema } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 import { Nullish } from "../typeUtils";
 
 export namespace FTTypes {
@@ -545,10 +545,12 @@ export namespace FTTypes {
    * Use "me" as the user ID to fetch projects for the authenticated user.
    * @summary List projects for a user
    */
-  export const ListUserProjectsQueryParams = Type.Object({
+  export const ListUserProjectsParams = Type.Object({
     id: Type.String({
       description: 'User ID or "me" for the authenticated user',
     }),
+  })
+  export const ListUserProjectsQueryParams = Type.Object({
     page: Nullish(
       Type.Number({
         description: "Page number for pagination",

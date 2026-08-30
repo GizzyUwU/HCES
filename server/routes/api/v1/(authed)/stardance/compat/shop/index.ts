@@ -1,23 +1,23 @@
 import Elysia from "elysia";
 import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
-import Stardance from "@server/scrapers/stardance";
-import { SDTypes } from "@server/scrapers/stardance/types";
+import StardanceCP from "@server/scrapers/stardance/cp";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
+import { CPTypes } from "@server/scrapers/compatibility/types";
 
 export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   "",
-  async ({ set, headers, request, params }) => {
+  async ({ set, headers, request }) => {
     try {
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
         cookie = "_stardance_session_4=" + cookie;
-      const client = new Stardance({
+      const client = new StardanceCP({
         logger,
         cookie,
         workerId: request.headers.get("x-hces-worker-id") ?? "",
       });
-      const res = await client.project(params);
+      const res = await client.shop()
       if (!res)
         throw new APIError({
           status: 500,
@@ -40,11 +40,10 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   },
   {
     detail: {
-      tags: ["Stardance", "Stardance / Projects"],
+      tags: ["Compatability", "Stardance", "StardanceCP / Shop"],
     },
-    params: SDTypes["ProjectParams"],
     response: {
-      200: SDTypes["Project"],
+      200: CPTypes["ShopItems"]
     },
   },
 );

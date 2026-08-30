@@ -1,13 +1,13 @@
-import Elysia from "elysia";
+import Elysia, { t } from "elysia";
 import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
 import Stardance from "@server/scrapers/stardance";
-import { SDTypes } from "@server/scrapers/stardance/types";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
+import { SDTypes } from "@server/scrapers/stardance/types";
 
 export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   "",
-  async ({ set, headers, request, params }) => {
+  async ({ set, headers, request, query }) => {
     try {
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
@@ -17,7 +17,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
         cookie,
         workerId: request.headers.get("x-hces-worker-id") ?? "",
       });
-      const res = await client.project(params);
+      const res = await client.shop(query)
       if (!res)
         throw new APIError({
           status: 500,
@@ -29,7 +29,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
       set.status = client.lastCode ?? 200;
       return res;
     } catch (err) {
-      logger.error("Failed getting project data", {
+      logger.error("Failed getting sd shop data", {
         error: err,
       });
       throw new APIError({
@@ -40,11 +40,15 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   },
   {
     detail: {
-      tags: ["Stardance", "Stardance / Projects"],
+      tags: ["Stardance", "Stardance / Shop"],
     },
-    params: SDTypes["ProjectParams"],
+    query: t.Object({
+      category: t.Optional(t.String({
+        description: "Category to look at"
+      }))
+    }),
     response: {
-      200: SDTypes["Project"],
+      200: SDTypes["ShopItems"]
     },
   },
 );

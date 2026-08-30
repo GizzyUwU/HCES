@@ -1,21 +1,8 @@
 import { logger as LogType } from "@server/index.ts";
 import prometheusRegistry from "@server/lib/metrics";
-import { load, type CheerioAPI } from "cheerio";
-import type { Element } from "domhandler";
 import { FTTypes } from "./types";
 import { type Static } from "elysia";
-import TurndownService from "turndown";
 import { Histogram } from "prom-client";
-const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
-const turndown = new TurndownService({
-  headingStyle: "atx",
-  codeBlockStyle: "fenced",
-});
-
-turndown.addRule("stripAnchors", {
-  filter: (node) => node.nodeName === "A" && node.classList.contains("anchor"),
-  replacement: () => "",
-});
 
 const flavortownRequestDuration = new Histogram({
   name: "flavortown_request_duration_seconds",
@@ -29,7 +16,6 @@ export default class Flavortown {
   lastCode: number | null = null;
   private ready: Promise<void>;
   private logger: typeof LogType;
-  private keySet: boolean = false;
   private workerId: string | null = null;
   private key: string = "";
   public updatedCookie: string | undefined;
@@ -48,7 +34,6 @@ export default class Flavortown {
   }) {
     this.logger = logger;
     this.workerId = workerId ?? null;
-    this.keySet = true;
     this.key = key;
     this.ready = Promise.resolve();
   }
@@ -59,6 +44,7 @@ export default class Flavortown {
       query?: Record<string, unknown>;
     },
   ): Promise<Response> {
+    try {
     const headers = new Headers(init?.headers);
     headers.set("X-Flavortown-Ext-1865", "true");
     headers.set("Authorization", "Bearer " + this.key);
@@ -85,7 +71,13 @@ export default class Flavortown {
       );
     }
     this.lastCode = res.status;
-    return res;
+      return res;
+    } catch (err) {
+      this.logger.info("Flavortown API failed with an error", {
+        error: err
+      })
+      throw new Error("Flavortown API failed with an error")
+    }
   }
 
   async shop(): Promise<Static<
@@ -99,36 +91,36 @@ export default class Flavortown {
   }
 
   async shopItem(
-    data: Static<(typeof FTTypes)["GetStoreItemParams"]>,
+    params: Static<(typeof FTTypes)["GetStoreItemParams"]>,
   ): Promise<Static<(typeof FTTypes)["GetStoreItemResponse"]> | null> {
     await this.ready;
-    const res = await this.request("/store/" + data.id);
+    const res = await this.request("/store/" + params.id);
     const resData = await res.json();
     this.lastCode = res.status;
     return resData;
   }
 
   async project(
-    data: Static<(typeof FTTypes)["GetProjectParams"]>,
+    params: Static<(typeof FTTypes)["GetProjectParams"]>,
   ): Promise<Static<(typeof FTTypes)["GetProjectResponse"]> | null> {
     await this.ready;
     try {
-      const res = await this.request("/projects/" + data.id);
+      const res = await this.request("/projects/" + params.id);
       const resData = await res.json();
       this.lastCode = resData.status;
-      return data;
+      return resData;
     } catch (err: any) {
       return null;
     }
   }
 
   async allDevlogs(
-    data: Static<(typeof FTTypes)["ListDevlogsQueryParams"]>,
+    query: Static<(typeof FTTypes)["ListDevlogsQueryParams"]>,
   ): Promise<Static<(typeof FTTypes)["ListDevlogsResponse"]> | null> {
     await this.ready;
     try {
       const res = await this.request("/devlogs", {
-        query: data,
+        query,
       });
       const resData = await res.json();
       this.lastCode = res.status;
@@ -139,13 +131,13 @@ export default class Flavortown {
   }
 
   async devlogs(
-    data: Static<(typeof FTTypes)["ListProjectDevlogsParams"]>,
-    query: Static<(typeof FTTypes)["ListProjectDevlogsQueryParams"]>,
+    params: Static<(typeof FTTypes)["ListProjectDevlogsParams"]>,
+    query?: Static<(typeof FTTypes)["ListProjectDevlogsQueryParams"]>,
   ): Promise<Static<(typeof FTTypes)["ListDevlogsResponse"]> | null> {
     await this.ready;
     try {
       const res = await this.request(
-        "/projects/" + data.project_id + "/devlogs",
+        "/projects/" + params.project_id + "/devlogs",
         {
           query,
         },
@@ -159,13 +151,11 @@ export default class Flavortown {
   }
 
   async devlog(
-    data: Static<(typeof FTTypes)["GetDevlogParams"]>,
-  ): Promise<Static<(typeof FTTypes)["ListDevlogsResponse"]> | null> {
+    params: Static<(typeof FTTypes)["GetDevlogParams"]>,
+  ): Promise<Static<(typeof FTTypes)["GetDevlogResponse"]> | null> {
     await this.ready;
     try {
-      const res = await this.request("/devlogs/" + data.id, {
-        query: data,
-      });
+      const res = await this.request("/devlogs/" + params.id);
       const resData = await res.json();
       this.lastCode = res.status;
       return resData;
@@ -191,11 +181,28 @@ export default class Flavortown {
   }
 
   async user(
-    data: Static<(typeof FTTypes)["GetUserParams"]>,
+    params: Static<(typeof FTTypes)["GetUserParams"]>,
   ): Promise<Static<(typeof FTTypes)["GetUserResponse"]> | null> {
     await this.ready;
     try {
-      const res = await this.request("/users/" + data.id);
+      const res = await this.request("/users/" + params.id);
+      const resData = await res.json();
+      this.lastCode = res.status;
+      return resData;
+    } catch (err: any) {
+      return null;
+    }
+  }
+
+  async userProjects(
+    params: Static<(typeof FTTypes)["ListUserProjectsParams"]>,
+    query?: Static<(typeof FTTypes)["ListUserProjectsQueryParams"]>,
+  ): Promise<Static<(typeof FTTypes)["ListUserProjectsResponse"]> | null> {
+    await this.ready;
+    try {
+      const res = await this.request("/users/" + params.id + "/projects", {
+        query
+      });
       const resData = await res.json();
       this.lastCode = res.status;
       return resData;

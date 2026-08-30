@@ -1,13 +1,30 @@
 import { t } from "elysia";
-import { Nullable } from "../typeUtils";
+import { Duration, Nullable } from "../typeUtils";
 export namespace SDTypes {
+  export const ShopParams = t.Object({
+    id: t.Optional(t.Number({
+      description: "Item ID",
+    })),
+    category: t.Optional(t.String({
+      description: "Category to look at"
+    }))
+  });
   export const ShopItem = t.Object({
+    id: t.Number(),
     title: t.String(),
+    image: t.String({
+      format: "uri",
+    }),
     description: t.String(),
-    avgHours: t.String(),
+    avgHours: t.Number({
+      minimum: 0
+    }),
     price: t.Number({ exclusiveMinimum: -Infinity }),
     stock: Nullable(t.Number()),
-    requirements: Nullable(t.String({ description: "Requirements in order to buy the item" }))
+    requirements: Nullable(
+      t.String({ description: "Requirements in order to buy the item" }),
+    ),
+    regionsEnabled: Nullable(t.Record(t.String(), t.Boolean())),
   });
   export const ShopItems = t.Array(ShopItem);
 
@@ -61,9 +78,11 @@ export namespace SDTypes {
   export const DevlogParams = t.Composite([
     ProjectParams,
     t.Object({
-      devlogId: t.Optional(t.Number({
-        description: "Devlog ID",
-      })),
+      devlogId: t.Optional(
+        t.Number({
+          description: "Devlog ID",
+        }),
+      ),
     }),
   ]);
   export const Devlog = t.Object({
@@ -73,19 +92,20 @@ export namespace SDTypes {
       description: "Time of a devlog in ISO 8601 Duration",
     }),
     description: t.String(),
-    imageUrls: t.Array(
+    mediaUrls: t.Array(
       t.Object({
         alt: t.String(),
         src: t.String(),
       }),
     ),
-    totalComments: t.Number(),
-    totalReposts: t.Number(),
-    totalLikes: t.Number(),
-    totalViews: t.Number(),
+    comments: t.Number(),
+    reposts: t.Number(),
+    likes: t.Number(),
+    views: t.Number(),
   });
-  
+
   export const Project = t.Object({
+    id: t.Number(),
     name: t.String(),
     description: t.String(),
     banner: t.String(),
@@ -93,9 +113,27 @@ export namespace SDTypes {
       pfp: t.String(),
       name: t.String(),
     }),
+    demoUrl: Nullable(
+      t.String({
+        format: "uri",
+      }),
+    ),
+    repoUrl: Nullable(
+      t.String({
+        format: "uri",
+      }),
+    ),
+    readmeUrl: Nullable(
+      t.String({
+        format: "uri",
+      }),
+    ),
     isSuperStarred: t.Boolean(),
     totalDevlogs: t.Number(),
-    totalDuration: t.String({ description: "Total time in ISO 8601 Duration" }),
+    totalDuration: t.String({
+      description: "Total time in ISO 8601 duration format",
+      pattern: Duration,
+    }),
     followers: t.Number(),
     devlogs: t.Array(Devlog),
   });

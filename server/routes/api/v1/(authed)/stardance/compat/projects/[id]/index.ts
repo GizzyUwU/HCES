@@ -1,7 +1,7 @@
 import Elysia from "elysia";
 import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
-import Stardance from "@server/scrapers/stardance/cp";
+import StardanceCP from "@server/scrapers/stardance/cp";
 import { CPTypes } from "@server/scrapers/compatibility/types";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
 
@@ -12,7 +12,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
         cookie = "_stardance_session_4=" + cookie;
-      const client = new Stardance({
+      const client = new StardanceCP({
         logger,
         cookie,
         workerId: request.headers.get("x-hces-worker-id") ?? "",
@@ -40,7 +40,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   },
   {
     detail: {
-      tags: ["Compatability", "Stardance"],
+      tags: ["Compatability", "Stardance", "StardanceCP / Projects"],
     },
     params: CPTypes["ProjectParams"],
     response: {

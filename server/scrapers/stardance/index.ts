@@ -29,19 +29,7 @@ const stardanceRequestDuration = new Histogram({
   name: "stardance_request_duration_seconds",
   help: "Duration of requests to Stardance in seconds",
   labelNames: ["path", "status", "worker_id"],
-  buckets: [
-    0.01,
-    0.025,
-    0.05,
-    0.1,
-    0.25,
-    0.5,
-    1,
-    2.5,
-    5,
-    10,
-    30,
-  ],
+  buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
   registers: [prometheusRegistry],
 });
 
@@ -57,7 +45,15 @@ export default class Stardance {
     baseUrl: "https://stardance.hackclub.com",
   };
 
-  constructor({ logger, cookie, workerId }: { logger: typeof LogType; cookie?: string; workerId?: string }) {
+  constructor({
+    logger,
+    cookie,
+    workerId,
+  }: {
+    logger: typeof LogType;
+    cookie?: string;
+    workerId?: string;
+  }) {
     this.logger = logger;
     this.workerId = workerId ?? null;
     if (cookie) {
@@ -70,7 +66,7 @@ export default class Stardance {
   private async request(path: string, init?: RequestInit): Promise<Response> {
     const headers = new Headers(init?.headers);
     if (this.cookie) headers.set("Cookie", this.cookie);
-    const before = performance.now()
+    const before = performance.now();
     const res = await fetch("https://stardance.hackclub.com" + path, {
       ...init,
       headers,
@@ -80,7 +76,7 @@ export default class Stardance {
         {
           path,
           status: String(res.status),
-          worker_id: this.workerId
+          worker_id: this.workerId,
         },
         (performance.now() - before) / 1000,
       );
@@ -95,12 +91,14 @@ export default class Stardance {
   }
 
   async shop(
-    category?: string,
+    data?: Static<(typeof SDTypes)["ShopParams"]>,
   ): Promise<Static<(typeof SDTypes)["ShopItems"]> | null> {
     await this.ready;
     const res = await this.request(
       "/shop" +
-        (category && category.length > 0 ? "/" + category : "/category/all"),
+        (data?.category && data.category.length > 0
+          ? "/category/" + data.category
+          : "/category/all"),
     );
     const html = await res.text();
     this.lastCode = res.status;
@@ -120,19 +118,58 @@ export default class Stardance {
     }
     const $ = load(html);
     const shopItems = $(".shop-item-card").toArray();
-    const normalizeItems = shopItems.map((bItem) => {
-      const item = $(bItem);
-      const title = item.find(".shop-item-card__title").text();
-      const description = item.find(".shop-item-card__description p").text();
-      const avgHours = item.find(".shop-item-card__hours").text();
-      const price = item.find(".action-btn .action-btn__label").text();
-      return {
-        title,
-        description,
-        avgHours,
-        price: Number(price.replace(/[^\d]/g, "")),
-      };
-    });
+    const normalizeItems = shopItems
+      .filter((bItem) => {
+        if (data?.id === undefined) return true;
+        const item = $(bItem);
+        const id = parseNum(item.attr("data-shop-id") ?? "0");
+        return id === data.id;
+      })
+      .map((bItem): Static<(typeof SDTypes)["ShopItem"]> => {
+        const item = $(bItem);
+        const id = parseNum(item.attr("data-shop-id") ?? "0");
+        const title = item.find(".shop-item-card__title").text();
+        const description = item.find(".shop-item-card__description p").text();
+        const image = item.find(".shop-item-card__image").attr("src") ?? "";
+        const avgHoursVal = [...item.find(".shop-item-card__hours").text().matchAll(
+          /(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/g,
+        )].map((match) => {
+          const value = Number(match[1]);
+          return /minutes?|mins?/.test(match[2] ?? "") ? value / 60 : value;
+        });
+        const avgHours =
+          avgHoursVal.length > 0
+            ? avgHoursVal.reduce((a, b) => a + b, 0) / avgHoursVal.length
+            : 0;
+        const price = parseNum(item.attr("data-price") ?? "0");
+        const requirements =
+          item.find(".shop-item-card__achievement-names").text() ?? null;
+        const rawStock = item.find(".shop-item-card__stock-badge").text().trim();
+        const stock =
+          rawStock === ""
+            ? null :
+          rawStock === "Out of stock"
+            ? 0
+            : parseNum(rawStock.replace(/\s+left$/, ""));
+        const regions = Object.fromEntries(
+          (item.attr("data-regions") ?? "")
+            .split(",")
+            .map((region) => region.trim())
+            .filter(Boolean)
+            .map((region) => [region, true]),
+        );
+        return {
+          id,
+          title,
+          description,
+          image,
+          avgHours,
+          price,
+          requirements,
+          stock,
+          regionsEnabled: regions,
+        };
+      });
     return normalizeItems;
   }
 
@@ -293,11 +330,9 @@ export default class Stardance {
   async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
-    const start = performance.now();
     try {
       const res = await this.request("/admin/certification/review/dashboard");
       const html = await res.text();
-      const received = performance.now();
       this.lastCode = res.status;
       if (!(
         typeof html === "string" &&
@@ -335,13 +370,6 @@ export default class Stardance {
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^@/, "");
-      const parsed = performance.now();
-      console.log({
-        request: `${(received - start).toFixed(2)}ms`,
-        parse: `${(parsed - received).toFixed(2)}ms`,
-        total: `${(parsed - start).toFixed(2)}ms`,
-        bytes: html.length,
-      });
       return {
         myUsername,
         reviewerLb,
@@ -357,7 +385,7 @@ export default class Stardance {
 
   private async getDevlogs(
     $: CheerioAPI,
-    devlogId?: Static<(typeof SDTypes)["DevlogParams"]>["devlogId"]
+    devlogId?: Static<(typeof SDTypes)["DevlogParams"]>["devlogId"],
   ): Promise<Static<(typeof SDTypes)["Project"]>["devlogs"]> {
     const feed = $(".project-show__feed");
     if (!feed.is("section")) return [];
@@ -386,10 +414,10 @@ export default class Stardance {
               src: image.attr("src") ?? "",
             };
           });
-        let totalComments = 0,
-          totalReposts = 0,
-          totalLikes = 0,
-          totalViews = 0;
+        let comments = 0,
+          reposts = 0,
+          likes = 0,
+          views = 0;
         for (const bEl of article
           .find(".feed-post-card__actions")
           .children()
@@ -397,20 +425,18 @@ export default class Stardance {
           const action = $(bEl);
           switch (true) {
             case action.hasClass("feed-post-card__comment-action"):
-              totalComments = parseNum(
+              comments = parseNum(
                 action.find("span[id^='comments_count_']").text(),
               );
               break;
             case action.hasClass("feed-post-card__repost"):
-              totalReposts = parseNum(
-                action.find("summary span").first().text(),
-              );
+              reposts = parseNum(action.find("summary span").first().text());
               break;
             case action.hasClass("feed-post-card__like"):
-              totalLikes = parseNum(action.find(".like-button__count").text());
+              likes = parseNum(action.find(".like-button__count").text());
               break;
             case (action.attr("aria-label") ?? "").startsWith("Seen by"):
-              totalViews = parseNum(action.find("span").last().text());
+              views = parseNum(action.find("span").last().text());
               break;
             default:
               break;
@@ -425,11 +451,11 @@ export default class Stardance {
           description: body.hasClass("markdown-content")
             ? turndown.turndown(body.html() ?? "").trim()
             : body.text().trim(),
-          imageUrls: imageUrls.get(),
-          totalComments,
-          totalReposts,
-          totalLikes,
-          totalViews,
+          mediaUrls: imageUrls.get(),
+          comments,
+          reposts,
+          likes,
+          views,
         };
       })
       .get();
@@ -508,8 +534,15 @@ export default class Stardance {
         superStarBadge && superStarBadge.includes("⭐ Super Star Project")
           ? true
           : false;
+      const repoUrl =
+        projectShowPanel
+          .find(
+            ".project-show__pill.project-show__pill--outline.project-show__pill--github",
+          )
+          .attr("href") ?? null;
       const devlogs = await this.getDevlogs($);
       return {
+        id: data.id,
         name,
         description,
         banner,
@@ -517,6 +550,9 @@ export default class Stardance {
           pfp: makerPFP,
           name: makerName,
         },
+        demoUrl: null,
+        readmeUrl: null,
+        repoUrl,
         isSuperStarred,
         totalDevlogs,
         totalDuration,
@@ -544,14 +580,17 @@ export default class Stardance {
           ""
         ).includes("text/html")
       )) {
-        this.logger.warn("Project endpoint didn't return HTML trying to get devlogs", {
-          contentType:
-            String(res.headers.get("Content-Type")) ??
-            String(res.headers.get("Content-Type")) ??
-            "",
-          status: res.status,
-          projectId: data.id,
-        });
+        this.logger.warn(
+          "Project endpoint didn't return HTML trying to get devlogs",
+          {
+            contentType:
+              String(res.headers.get("Content-Type")) ??
+              String(res.headers.get("Content-Type")) ??
+              "",
+            status: res.status,
+            projectId: data.id,
+          },
+        );
         return null;
       }
       const $ = load(html);

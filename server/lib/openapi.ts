@@ -1,6 +1,13 @@
 import { toOpenAPISchema } from "@elysia/openapi";
 import type { OpenAPIV3 } from "openapi-types";
 
+type ScalarOpenAPIDocument = OpenAPIV3.Document & {
+  "x-tagGroups"?: {
+    name: string;
+    tags: string[];
+  }[];
+};
+
 export function getPublicOpenApiSpec(
   app: Parameters<typeof toOpenAPISchema>[0],
 ) {
@@ -33,11 +40,24 @@ export function getPublicOpenApiSpec(
         StardanceCookie: {
           type: "apiKey",
           in: "header",
-          name: "x-stardance-cookie",
+          name: "X-Stardance-Cookie",
+        },
+        FlavortownKey: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Flavortown-Key",
         },
       },
     },
     tags: [
+      {
+        name: "HCES",
+        description: "All endpoints that are for HCES",
+      },
+      {
+        name: "Generic",
+        description: "Generic endpoints for HCES",
+      },
       {
         name: "Compatability",
         description:
@@ -47,6 +67,73 @@ export function getPublicOpenApiSpec(
         name: "Stardance",
         description: "All endpoints that are for Stardance",
       },
+      
+      {
+        name: "Stardance / Generic",
+        description: "Stardance generic endpoints",
+      },
+      {
+        name: "Stardance / Projects",
+        description: "Stardance projects endpoints",
+      },
+      {
+        name: "Stardance / Sho",
+        description: "Stardance shop endpoints",
+      },
+      {
+        name: "Flavortown",
+        description: "All endpoints that are for Flavortown",
+      },
+      {
+        name: "Flavortown / Devlogs",
+        description: "Flavortown devlogs endpoints",
+      },
+      {
+        name: "Flavortown / Projects",
+        description: "Flavortown projects endpoints",
+      },
+      {
+        name: "Flavortown / Shop",
+        description: "Flavortown shop endpoints",
+      },
+      {
+        name: "Flavortown / Users",
+        description: "Flavortown users endpoints",
+      },
     ],
-  } satisfies OpenAPIV3.Document;
+    "x-tagGroups": [
+      {
+        name: "HCES",
+        tags: [
+          "Generic",
+        ],
+      },
+      {
+        name: "Compatability",
+        tags: [
+          "StardanceCP / Projects",
+          "StardanceCP / Shop",
+          "FlavortownCP / Projects",
+          "FlavortownCP / Shop",
+        ],
+      },
+      {
+        name: "Stardance",
+        tags: [
+          "Stardance / Generic",
+          "Stardance / Projects",
+          "Stardance / Shop",
+        ],
+      },
+      {
+        name: "Flavortown",
+        tags: [
+          "Flavortown / Projects",
+          "Flavortown / Devlogs",
+          "Flavortown / Shop",
+          "Flavortown / Users",
+        ],
+      },
+    ],
+  } satisfies ScalarOpenAPIDocument;
 }

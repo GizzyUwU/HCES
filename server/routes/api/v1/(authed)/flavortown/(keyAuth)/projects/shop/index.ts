@@ -1,26 +1,28 @@
 import Elysia from "elysia";
 import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
-import { stardanceCookie } from "../(cookieProvided)";
-import { SDTypes } from "@server/scrapers/stardance/types";
-import { dispatchGuard } from "../../dispatchGuard";
+import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
+import { flavortownKey } from "@server/routes/api/v1/(authed)/flavortown/(keyAuth)";
+import { FTTypes } from "@server/scrapers/flavortown/types";
 
 export default new Elysia()
-  .use(stardanceCookie)
-  .use(dispatchGuard(["x-stardance-cookie"]))
+  .use(flavortownKey)
+  .use(dispatchGuard(["x-flavortown-key"]))
   .get(
     "",
-    async ({ client }) => {
+    async ({ set, client }) => {
       try {
-        const res = await client.goiStats();
+        const res = await client.shop()
         if (!res)
           throw new APIError({
             status: 500,
             msg: "internal_server_error",
           });
+
+        set.status = client.lastCode ?? 200;
         return res;
       } catch (err) {
-        logger.error("Failed getting goi stats data", {
+        logger.error("Failed getting project data", {
           error: err,
         });
         throw new APIError({
@@ -31,11 +33,10 @@ export default new Elysia()
     },
     {
       detail: {
-        tags: ["Stardance", "Stardance / Generic"],
-        security: [{ Header: [], StardanceCookie: [] }],
+        tags: ["Flavortown"],
       },
       response: {
-        200: SDTypes["GoiStats"],
+        200: FTTypes["ListStoreItemsResponse"],
       },
     },
   );

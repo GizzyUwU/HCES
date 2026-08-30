@@ -40,7 +40,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   },
   {
     detail: {
-      tags: ["Stardance"],
+      tags: ["Stardance", "Stardance / Projects"],
     },
     params: SDTypes["ProjectParams"],
     response: {
