@@ -1,0 +1,19 @@
+services:
+  hcesworker:
+    build:
+      context: .
+    env_file: .env
+    extra_hosts:
+      - WORKER=true
+      - "host.docker.internal:host-gateway"
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8000/healthcheck | jq -e '.okay == true' >/dev/null",
+        ]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 4s

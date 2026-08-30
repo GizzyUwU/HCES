@@ -1,0 +1,21 @@
+services:
+  hces:
+    build:
+      context: .
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    ports:
+      - 20261:8000
+      - 5748:3000
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8000/healthcheck | jq -e '.okay == true' >/dev/null",
+        ]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 4s
