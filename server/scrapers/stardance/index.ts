@@ -248,7 +248,7 @@ export default class Stardance {
     let certifiedHours = 0,
       streak = 0,
       shareThisWeek = 0,
-      rankThisWeek = 0;
+      diffPplProjectsReviewed = 0
 
     let bestDay: {
       devlogCount: number;
@@ -258,12 +258,12 @@ export default class Stardance {
       date: "",
     };
 
-    let diffPplProjectsReviewed: {
+    let rankThisWeek: {
       rank: number;
       totalPpl: number;
     } = {
       rank: 0,
-      totalPpl: 0,
+      totalPpl: 0
     };
 
     for (const bStat of stats) {
@@ -276,10 +276,7 @@ export default class Stardance {
           certifiedHours = parseNum(value);
           break;
         case "People's projects you've reviewed":
-          diffPplProjectsReviewed.rank = parseNum(value);
-          diffPplProjectsReviewed.totalPpl = Number(
-            note.replace(/,/g, "").match(/\d+/)?.[0] ?? 0,
-          );
+          diffPplProjectsReviewed = parseNum(value);
           break;
         case "Day streak":
           streak = parseNum(value);
@@ -294,7 +291,8 @@ export default class Stardance {
           shareThisWeek = parseNum(value.replace(/%/g, ""));
           break;
         case "Rank this week":
-          rankThisWeek = parseNum(value.replace(/^#/, ""));
+          rankThisWeek.rank = parseNum(value.replace(/^#/, ""));
+          rankThisWeek.totalPpl = parseNum(note.match(/of (\d+) reviewers/)?.[1] ?? "0");
           break;
         default:
           break;

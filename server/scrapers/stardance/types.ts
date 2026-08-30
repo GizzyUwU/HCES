@@ -53,7 +53,10 @@ export namespace SDTypes {
     numberNeededToTodaysGoal: Nullable(t.Number()),
     personalStats: t.Object({
       shareThisWeek: t.Number(),
-      rankThisWeek: t.Number(),
+      rankThisWeek: t.Object({
+        rank: t.Number(),
+        totalPpl: t.Number()
+      }),
       streak: t.Number(),
       bestDay: t.Object({
         devlogCount: t.Number(),
@@ -63,10 +66,7 @@ export namespace SDTypes {
       devlogsTillMorePay: Nullable(t.Number()),
       currentPay: t.Number(),
       certifiedHours: t.Number(),
-      diffPplProjectsReviewed: t.Object({
-        rank: t.Number(),
-        totalPpl: t.Number(),
-      }),
+      diffPplProjectsReviewed: t.Number()
     }),
   });
 
