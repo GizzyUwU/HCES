@@ -1,7 +1,7 @@
 FROM oven/bun:alpine
 WORKDIR /usr/src/app
 RUN apk add curl wget su-exec jq git --no-cache
-RUN git clone --no-checkout --depth 1 https://github.com/gizzyuwu/hces.git /usr/src/app
+RUN git clone --depth 1 https://github.com/gizzyuwu/hces.git /usr/src/app
 RUN bun install --frozen-lockfile --production
 RUN chown bun:bun /usr/src/app
 RUN chmod +x /usr/src/app/entrypoint.sh
