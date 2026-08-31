@@ -32,3 +32,13 @@ services:
     restart: always
     ports:
       - "5748:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sS -D /tmp/headers -o /dev/null http://localhost:3000/ && grep -qi '^content-type:.*text/html' /tmp/headers",
+        ]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 4s

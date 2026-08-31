@@ -1,11 +1,10 @@
 FROM oven/bun:alpine AS gitfetch
-RUN apk add git
+RUN apk --no-cache add git
 RUN git clone --no-checkout --depth 1 https://github.com/gizzyuwu/logpheus.git /tmp/repo
 
 FROM oven/bun:alpine
 WORKDIR /usr/src/app
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add curl su-exec jq git
+RUN apk add --no-cache curl su-exec jq git
 COPY --chown=bun:bun . .
 RUN bun install --lockfile-only
 RUN bun install --production
