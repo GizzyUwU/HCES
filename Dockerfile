@@ -10,5 +10,6 @@ RUN bun install --lockfile-only
 RUN bun install --production
 RUN chown bun:bun /usr/src/app
 RUN chmod +x /usr/src/app/entrypoint.sh
+COPY --chown=bun:bun --from=gitfetch /tmp/repo/.git /usr/src/app/.git
 EXPOSE 8000/tcp
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
