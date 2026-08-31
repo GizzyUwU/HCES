@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:sd": "concurrently -k -s first -n server,test -c green,blue \"bun run server/index.ts\" \"until curl -s http://localhost:8000 > /dev/null; do sleep 0.2; done; bun test sd.api.test.ts\"",
     "dev": "concurrently -n vite,server -c blue,green \"vite --host\" \"bun run --watch server/index.ts\"",
-    "prod:frontend": "vite --host",
+    "build:frontend": "vite build",
     "prod:backend": "bun run server/index.ts"
   },
   "dependencies": {
@@ -58,7 +58,8 @@
     "vite-plugin-solid": "^2.11.14",
     "vitest": "^4.1.10",
     "ws-asyncapi": "^0.1.1",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "unplugin-icons": "^23.0.1"
   },
   "overrides": {
     "@sinclair/typebox": "0.34.52"
@@ -70,8 +71,7 @@
     "@types/turndown": "^5.0.6",
     "bun-types": "latest",
     "concurrently": "^10.0.5",
-    "tsx": "^4.23.12",
-    "unplugin-icons": "^23.0.1"
+    "tsx": "^4.23.12"
   },
   "module": "src/index.js"
 }

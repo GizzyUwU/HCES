@@ -3,8 +3,6 @@ services:
     build:
       context: .
     env_file: .env
-    environment:
-      - SERVICE=backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
@@ -24,9 +22,9 @@ services:
   hces_frontend:
     build:
       context: .
+      dockerfile: Frontend.Dockerfile
     env_file: .env
     environment:
-      - SERVICE=frontend
       - BACKEND_URL=http://hces:8000
     depends_on:
       hces:

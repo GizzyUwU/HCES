@@ -13,5 +13,4 @@ RUN bunx drizzle-kit generate
 RUN chown bun:bun /usr/src/app
 RUN chmod +x /usr/src/app/entrypoint.sh
 EXPOSE 8000/tcp
-EXPOSE 3000/tcp
 ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
