@@ -92,9 +92,9 @@ const AuthGuard: ParentComponent = (props) => {
             <img src={logo} title="HCES" class="text-2 h-5" />
           </div>
           <div class="flex gap-2 ml-[120px]">
-            <A href="/stats" class="no-underline text-white hover:text-secondary-dark">
+            {/*<A href="/stats" class="no-underline text-white hover:text-secondary-dark">
               Statistics
-            </A>
+            </A>*/}
             <A href="/" class="no-underline text-white hover:text-secondary-dark">
               Manage
             </A>
