@@ -104,7 +104,6 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     logLevel: LogLevel.Verbose,
   });
   const baseApp = new Elysia()
-    .use(routes)
     .onRequest(({ request }) => {
       requestStartTimes.set(request, performance.now());
       logger.info(
@@ -180,6 +179,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       }
     })
     .use(auth)
+    .use(routes)
     .use(workerChannel)
     .use(
       cors({
