@@ -1,6 +1,6 @@
 import { type Static } from "elysia";
-import type { CPScraperAdapter } from "../compatibility/adapter";
-import { CPTypes } from "../compatibility/types";
+import type { CPScraperAdapter } from "@server/scrapers/compatibility/adapter";
+import { CPTypes } from "@server/scrapers/compatibility/types";
 import Flavortown from ".";
 
 export default class FlavortownCP implements CPScraperAdapter {

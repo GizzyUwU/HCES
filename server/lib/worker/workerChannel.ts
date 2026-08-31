@@ -1,9 +1,9 @@
 import Elysia from "elysia";
 import { createHash } from "node:crypto";
 import { registerWorker, unregisterWorker, resolveJob } from "./workerPool";
-import { db, logger } from "@server/index";
+import { db, logger } from "@server/lib/utils";
 import { workers } from "@server/schema/workers";
-import { APIError } from "../error";
+import { APIError } from "@server/lib/error";
 import bearer from "@elysia/bearer";
 import { eq } from "drizzle-orm";
 const lastCheese = new Map<string, number>();

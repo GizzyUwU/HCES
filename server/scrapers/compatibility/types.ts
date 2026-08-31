@@ -1,5 +1,5 @@
 import { t } from "elysia";
-import { Duration, Nullable } from "../typeUtils";
+import { Duration, Nullable } from "@server/scrapers/typeUtils";
 export namespace CPTypes {
   export const ShopParams = t.Object({
     id: t.Optional(t.String({

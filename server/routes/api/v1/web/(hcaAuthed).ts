@@ -1,8 +1,8 @@
 import Elysia from "elysia";
-import { auth } from "../../../../lib/auth";
-import { getOrCreateSession } from "../../../../lib/session";
-import { db } from "../../../../index";
-import { users } from "../../../../schema/users";
+import { auth } from "@server/lib/auth";
+import { getOrCreateSession } from "@server/lib/session";
+import { db } from "@server/lib/utils";
+import { users } from "@server/schema/users";
 import { eq } from "drizzle-orm";
 import { APIError } from "@server/lib/error";
 

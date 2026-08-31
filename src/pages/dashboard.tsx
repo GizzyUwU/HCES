@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
 import { createMutation, createQuery } from "@tanstack/solid-query";
-import server, { isApiError, resolveErrorMessage } from "../backend";
+import server, { isApiError, resolveErrorMessage } from "@/backend";
 import { useQueryClient } from "@tanstack/solid-query";
 import { useToast } from "@/app";
 import { createSignal } from "solid-js";

@@ -1,5 +1,5 @@
-import { workerApp } from "../workerApp";
-import { logger } from "@server/index";
+import { workerApp } from "@server/lib/workerApp";
+import { logger } from "@server/lib/utils";
 export type JobMessage = {
   type: "job";
   id: string;

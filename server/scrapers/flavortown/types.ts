@@ -8,7 +8,7 @@
  */
 
 import { Type } from "@sinclair/typebox";
-import { Nullish } from "../typeUtils";
+import { Nullish } from "@server/scrapers/typeUtils";
 
 export namespace FTTypes {
   /**

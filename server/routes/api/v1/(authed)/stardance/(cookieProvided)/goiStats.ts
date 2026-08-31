@@ -1,9 +1,9 @@
 import Elysia from "elysia";
-import { logger } from "@server/index";
+import { logger } from "@server/lib/utils";
 import { APIError } from "@server/lib/error";
-import { stardanceCookie } from "../(cookieProvided)";
+import { stardanceCookie } from "@server/routes/api/v1/(authed)/stardance/(cookieProvided)";
 import { SDTypes } from "@server/scrapers/stardance/types";
-import { dispatchGuard } from "../../dispatchGuard";
+import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
 
 export default new Elysia()
   .use(stardanceCookie)

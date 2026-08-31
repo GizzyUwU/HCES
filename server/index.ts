@@ -1,94 +1,33 @@
 import { Elysia } from "elysia";
 import fsr, { LogLevel } from "elysia-fsr";
-import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
-import { AsyncLocalStorage } from "node:async_hooks";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { APIError, UnverifiedAccountError } from "./lib/error";
-import { session } from "./schema/users";
+import { APIError, UnverifiedAccountError } from "@server/lib/error";
+import { session } from "@server/schema/users";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { elysiaLogger } from "@logtape/elysia";
-import * as Sentry from "@sentry/bun";
-import { getSentrySink } from "@logtape/sentry";
 import { cron, Patterns } from "@elysiajs/cron";
 import openapi from "@elysia/openapi";
-import { getPublicOpenApiSpec } from "./lib/openapi";
+import { getPublicOpenApiSpec } from "@server/lib/openapi";
 import { YAML } from "bun";
-import { websocketHandler } from "./lib/ws";
+import { websocketHandler } from "@server/lib/ws";
 import { wsAsyncAPIAdapter } from "@ws-asyncapi/adapter-elysia";
 import { getAsyncApiDocument, getAsyncApiUI } from "ws-asyncapi";
-import { startRemoteWorker } from "./lib/worker/workerRuntime";
+import { startRemoteWorker } from "@server/lib/worker/workerRuntime";
 import { cors } from "@elysia/cors";
 import prometheusRegistry from "@server/lib/metrics";
 import {
   enableLocalWorker,
   resetStaleConnections,
-} from "./lib/worker/workerPool";
-import { workerChannel } from "./lib/worker/workerChannel";
+} from "@server/lib/worker/workerPool";
+import { workerChannel } from "@server/lib/worker/workerChannel";
 import { OpenPanel } from "@openpanel/sdk";
-import { Pool } from "pg";
-import { preconnectScrapers } from "./scrapers/preconnect";
+import { preconnectScrapers } from "@server/scrapers/preconnect";
 import { join } from "node:path";
 import { Counter, Histogram } from "prom-client";
+import { db, logger } from "@server/lib/utils";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
-if (process.env["SENTRY_DSN"]) {
-  Sentry.init({
-    dsn: process.env["SENTRY_DSN"],
-    release:
-      process.env["GIT_COMMIT_SHA"] || process.env["SENTRY_NAME"] || "hces",
-    environment:
-      Boolean(process.env["PRODUCTION"]) === true
-        ? "production"
-        : "development",
-    tracesSampleRate: 0.01,
-  });
-}
-
-const logLevel = {
-  1: "warning",
-  2: "trace",
-  3: "info",
-  4: "fatal",
-  5: "error",
-  6: "debug",
-} as const;
-
-await configure({
-  sinks: { console: getConsoleSink(), sentry: getSentrySink() },
-  filters: {
-    notExpectedClientError: (record) =>
-      !(
-        record.level === "error" &&
-        typeof record.properties["status"] === "number" &&
-        (record.properties["status"] as number) >= 400 &&
-        (record.properties["status"] as number) < 500
-      ),
-  },
-  loggers: [
-    {
-      category: ["logtape", "meta"],
-      sinks: ["console"],
-      lowestLevel: "error",
-    },
-    {
-      category: ["hces"],
-      sinks: [
-        "console",
-        ...(process.env["SENTRY_DSN"] ? (["sentry"] as const) : []),
-      ],
-      lowestLevel:
-        logLevel[Number(process.env["LOG_LEVEL"]) as keyof typeof logLevel] ??
-        "info",
-    },
-  ],
-  contextLocalStorage: new AsyncLocalStorage(),
-});
-
-export let db!: ReturnType<typeof drizzle>;
 export let app: Elysia<any, any, any, any, any, any, any> | undefined;
-
-export const logger = getLogger(["hces"]);
 
 export let opClient: OpenPanel | undefined = undefined;
 if (
@@ -129,44 +68,23 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
 
   preconnectScrapers();
 } else {
-  const { auth } = await import("./lib/auth");
-  db = drizzle({
-    client: new Pool({
-      connectionString: process.env.DATABASE_URL!,
-      max: Number(process.env["DB_POOL_MAX"]) || 20,
-      idleTimeoutMillis: 30 * 1000,
-      connectionTimeoutMillis: 5 * 1000,
-    }),
-  });
+  const { auth } = await import("@server/lib/auth");
+
   await resetStaleConnections();
   const requestStartTimes = new WeakMap<Request, number>();
   const httpRequests = new Counter({
     name: "http_requests_total",
     help: "Total num of requests",
     labelNames: ["method", "path", "status"],
-    registers: [prometheusRegistry]
+    registers: [prometheusRegistry],
   });
   const httpRequestDuration = new Histogram({
     name: "http_requests_duration",
     help: "Duration of requests in seconds",
     labelNames: ["method", "path", "status"],
-    buckets: [
-      0.005,
-      0.01,
-      0.025,
-      0.05,
-      0.1,
-      0.25,
-      0.5,
-      1,
-      2.5,
-      5,
-      10,
-      30,
-    ],
-    registers: [prometheusRegistry]
+    buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
+    registers: [prometheusRegistry],
   });
-
 
   const getClientIp = (request: Request) => {
     if (Boolean(process.env["TRUST_X_FORWARDED_FOR"]) === true) {
@@ -186,34 +104,35 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     logLevel: LogLevel.Verbose,
   });
   const baseApp = new Elysia()
-    .onRequest(({
-      request,
-    }) => {
+    .use(routes)
+    .onRequest(({ request }) => {
       requestStartTimes.set(request, performance.now());
-      logger.info(`HTTP - ${request.method} - ${getClientIp(request)} - ${request.url}`, {
-        ip: getClientIp(request),
-        method: request.method,
-        url: request.url
-      })
+      logger.info(
+        `HTTP - ${request.method} - ${getClientIp(request)} - ${request.url}`,
+        {
+          ip: getClientIp(request),
+          method: request.method,
+          url: request.url,
+        },
+      );
     })
-    .onAfterHandle(({
-      request,
-      set,
-      route
-    }) => {
+    .onAfterHandle(({ request, set, route }) => {
       const start = requestStartTimes.get(request);
       if (!start) return;
       const duration = (performance.now() - start) / 1000;
       httpRequests.inc({
         method: request.method,
         path: route,
-        status: set.status ?? 200
-      })
-      httpRequestDuration.observe({
-        method: request.method,
-        path: route,
-        status: set.status ?? 200
-      }, duration)
+        status: set.status ?? 200,
+      });
+      httpRequestDuration.observe(
+        {
+          method: request.method,
+          path: route,
+          status: set.status ?? 200,
+        },
+        duration,
+      );
     })
     .use(
       elysiaLogger({
@@ -261,7 +180,6 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       }
     })
     .use(auth)
-    .use(routes)
     .use(workerChannel)
     .use(
       cors({

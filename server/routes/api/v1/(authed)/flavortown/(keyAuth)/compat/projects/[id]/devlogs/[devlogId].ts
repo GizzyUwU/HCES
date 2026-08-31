@@ -1,5 +1,5 @@
 import Elysia, { t } from "elysia";
-import { logger } from "@server/index";
+import { logger } from "@server/lib/utils";
 import { APIError } from "@server/lib/error";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
 import { flavortownKey } from "@server/routes/api/v1/(authed)/flavortown/(keyAuth)";

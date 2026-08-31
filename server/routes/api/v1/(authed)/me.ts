@@ -1,10 +1,9 @@
 import Elysia, { t } from "elysia";
-import { db } from "@server/index";
+import { db, logger } from "@server/lib/utils";
 import { users } from "@server/schema/users";
 import { eq } from "drizzle-orm";
-import { logger } from "@server/index";
 import { APIError } from "@server/lib/error";
-import { keyguard } from "../(authed)";
+import { keyguard } from "@server/routes/api/v1/(authed)";
 import { createSelectSchema } from "drizzle-typebox";
 const _users = createSelectSchema(users);
 

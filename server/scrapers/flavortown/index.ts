@@ -1,4 +1,4 @@
-import { logger as LogType } from "@server/index.ts";
+import { logger as LogType } from "@server/lib/utils";
 import prometheusRegistry from "@server/lib/metrics";
 import { FTTypes } from "./types";
 import { type Static } from "elysia";
