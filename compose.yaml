@@ -17,7 +17,7 @@ services:
       interval: 10s
       timeout: 2s
       retries: 5
-      start_period: 4s
+      start_period: 10s
 
   hces_frontend:
     build:
