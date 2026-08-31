@@ -183,7 +183,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
   const routes = await fsr({
     dir: join(import.meta.dir, "routes"),
     filter: "**/*.{ts,tsx,js,jsx,mjs,cjs}",
-    logLevel: LogLevel.Default,
+    logLevel: LogLevel.Verbose,
   });
   const baseApp = new Elysia()
     .onRequest(({
