@@ -1,4 +1,4 @@
-FROM oven/bun:alpine
+FROM oven/bun:debian
 WORKDIR /usr/src/app
 RUN apk add curl wget su-exec jq git --no-cache
 RUN git clone --depth 1 https://github.com/gizzyuwu/hces.git /usr/src/app
