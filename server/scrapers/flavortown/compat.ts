@@ -1,9 +1,9 @@
 import { type Static } from "elysia";
-import type { CPScraperAdapter } from "@server/scrapers/compatibility/adapter";
-import { CPTypes } from "@server/scrapers/compatibility/types";
+import type { CompatScraperAdapter } from "@server/scrapers/compatibility/adapter";
+import { CompatTypes } from "@server/scrapers/compatibility/types";
 import Flavortown from ".";
 
-export default class FlavortownCP implements CPScraperAdapter {
+export default class FlavortownCompat implements CompatScraperAdapter {
   private scraper: Flavortown;
   constructor(options: ConstructorParameters<typeof Flavortown>[0]) {
     this.scraper = new Flavortown(options);
@@ -18,8 +18,8 @@ export default class FlavortownCP implements CPScraperAdapter {
   }
 
   async shop(
-    data?: Static<(typeof CPTypes)["ShopParams"]>,
-  ): Promise<Static<(typeof CPTypes)["ShopItems"]> | null> {
+    data?: Static<(typeof CompatTypes)["ShopParams"]>,
+  ): Promise<Static<(typeof CompatTypes)["ShopItems"]> | null> {
     if (data?.id) {
       const item = await this.scraper.shopItem({
         id: Number(data.id),
@@ -49,7 +49,7 @@ export default class FlavortownCP implements CPScraperAdapter {
     } else {
       const items = await this.scraper.shop();
       if (!items) return null;
-      return items.map((item): Static<(typeof CPTypes)["ShopItem"]> => ({
+      return items.map((item): Static<(typeof CompatTypes)["ShopItem"]> => ({
         ...item,
         id: String(item.id),
         description: String(item.description),
@@ -71,8 +71,8 @@ export default class FlavortownCP implements CPScraperAdapter {
   }
 
   async devlogs(
-    data: Static<(typeof CPTypes)["DevlogParams"]>,
-  ): Promise<Static<(typeof CPTypes)["Devlogs"]> | null> {
+    data: Static<(typeof CompatTypes)["DevlogParams"]>,
+  ): Promise<Static<(typeof CompatTypes)["Devlogs"]> | null> {
     if (data.devlogId) {
       const item = await this.scraper.devlog({
         id: Number(data.devlogId),
@@ -101,7 +101,7 @@ export default class FlavortownCP implements CPScraperAdapter {
       });
       if (!items) return null;
       return (items.devlogs ?? []).map(
-        (item): Static<(typeof CPTypes)["Devlog"]> => {
+        (item): Static<(typeof CompatTypes)["Devlog"]> => {
           const hours = Math.floor((item.duration_seconds ?? 0) / 3600);
           const minutes = Math.floor(
             ((item.duration_seconds ?? 0) % 3600) / 60,
@@ -127,8 +127,8 @@ export default class FlavortownCP implements CPScraperAdapter {
   }
 
   async project(
-    data: Static<(typeof CPTypes)["ProjectParams"]>,
-  ): Promise<Static<(typeof CPTypes)["Project"]> | null> {
+    data: Static<(typeof CompatTypes)["ProjectParams"]>,
+  ): Promise<Static<(typeof CompatTypes)["Project"]> | null> {
     const item = await this.scraper.project({
       id: Number(data.id),
     });

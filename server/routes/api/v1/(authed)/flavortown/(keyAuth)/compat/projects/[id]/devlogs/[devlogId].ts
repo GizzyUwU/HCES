@@ -3,7 +3,7 @@ import { logger } from "@server/lib/utils";
 import { APIError } from "@server/lib/error";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
 import { flavortownKey } from "@server/routes/api/v1/(authed)/flavortown/(keyAuth)";
-import { CPTypes } from "@server/scrapers/compatibility/types";
+import { CompatTypes } from "@server/scrapers/compatibility/types";
 
 export default new Elysia()
   .use(flavortownKey)
@@ -37,11 +37,11 @@ export default new Elysia()
     },
     {
       detail: {
-        tags: ["Compatability", "Flavortown", "FlavortownCP / Projects"],
+        tags: ["Compatability", "Flavortown", "Flavortown Compat / Projects"],
         security: [{ Header: [], FlavortownKey: [] }],
       },
       params: t.Composite([
-        t.Omit(CPTypes.DevlogParams, ["devlogId"]),
+        t.Omit(CompatTypes.DevlogParams, ["devlogId"]),
         t.Object({
           devlogId: t.String({
             description: "Devlog ID",
@@ -49,7 +49,7 @@ export default new Elysia()
         }),
       ]),
       response: {
-        200: CPTypes["Devlogs"]
+        200: CompatTypes["Devlogs"]
       },
     },
   );

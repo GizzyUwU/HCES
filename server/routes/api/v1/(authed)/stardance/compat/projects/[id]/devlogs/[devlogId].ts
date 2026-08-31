@@ -1,8 +1,8 @@
 import Elysia from "elysia";
 import { logger } from "@server/lib/utils";
 import { APIError } from "@server/lib/error";
-import StardanceCP from "@server/scrapers/stardance/cp";
-import { CPTypes } from "@server/scrapers/compatibility/types";
+import StardanceCompat from "@server/scrapers/stardance/compat";
+import { CompatTypes } from "@server/scrapers/compatibility/types";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
 
 export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
@@ -12,7 +12,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
         cookie = "_stardance_session_4=" + cookie;
-      const client = new StardanceCP({ logger, cookie, workerId: request.headers.get("x-hces-worker-id") ?? "" });
+      const client = new StardanceCompat({ logger, cookie, workerId: request.headers.get("x-hces-worker-id") ?? "" });
 
       const res = await client.devlogs(params);
       if (!res)
@@ -37,11 +37,11 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   },
   {
     detail: {
-      tags: ["Compatability", "Stardance", "StardanceCP / Projects"],
+      tags: ["Compatability", "Stardance", "StardanceCompat / Projects"],
     },
-    params: CPTypes["DevlogParams"],
+    params: CompatTypes["DevlogParams"],
     response: {
-      200: CPTypes["Devlogs"],
+      200: CompatTypes["Devlogs"],
     },
   },
 );

@@ -111,10 +111,10 @@ export function getPublicOpenApiSpec(
       {
         name: "Compatability",
         tags: [
-          "StardanceCP / Projects",
-          "StardanceCP / Shop",
-          "FlavortownCP / Projects",
-          "FlavortownCP / Shop",
+          "Stardance Compat / Projects",
+          "Stardance Compat / Shop",
+          "Flavortown Compat / Projects",
+          "Flavortown Compat / Shop",
         ],
       },
       {

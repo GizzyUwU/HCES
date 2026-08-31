@@ -3,7 +3,7 @@ import { APIError } from "@server/lib/error";
 import { errorModel } from "@server/lib/errorModel";
 import { logger } from "@server/lib/utils";
 import Flavortown from "@server/scrapers/flavortown";
-import FlavortownCP from "@server/scrapers/flavortown/cp";
+import FlavortownCompat from "@server/scrapers/flavortown/compat";
 export const flavortownKey = () =>
   new Elysia({ name: "flavortownKey" })
     .resolve(async ({ headers, request }) => {
@@ -14,7 +14,7 @@ export const flavortownKey = () =>
           msg: "flavortown_key_required",
         });
       const client = new Flavortown({ logger, key, workerId: request.headers.get("x-hces-worker-id") ?? "" });
-      const clientCP = new FlavortownCP({ logger, key, workerId: request.headers.get("x-hces-worker-id") ?? "" });
+      const clientCP = new FlavortownCompat({ logger, key, workerId: request.headers.get("x-hces-worker-id") ?? "" });
       return {
         key,
         client,

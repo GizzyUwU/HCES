@@ -1,9 +1,9 @@
 import { type Static } from "elysia";
-import type { CPScraperAdapter } from "@server/scrapers/compatibility/adapter";
-import { CPTypes } from "@server/scrapers/compatibility/types";
+import type { CompatScraperAdapter } from "@server/scrapers/compatibility/adapter";
+import { CompatTypes } from "@server/scrapers/compatibility/types";
 import Stardance from ".";
 
-export default class StardanceCP implements CPScraperAdapter {
+export default class StardanceCompat implements CompatScraperAdapter {
   private scraper: Stardance;
   constructor(options: ConstructorParameters<typeof Stardance>[0]) {
     this.scraper = new Stardance(options);
@@ -18,27 +18,27 @@ export default class StardanceCP implements CPScraperAdapter {
   }
 
   async shop(
-    data?: Static<(typeof CPTypes)["ShopParams"]>,
-  ): Promise<Static<(typeof CPTypes)["ShopItems"]> | null> {
+    data?: Static<(typeof CompatTypes)["ShopParams"]>,
+  ): Promise<Static<(typeof CompatTypes)["ShopItems"]> | null> {
     const items = await this.scraper.shop({
       id: data?.id ? Number(data.id) : undefined,
     });
     if (!items) return null;
-    return items.map((item): Static<(typeof CPTypes)["ShopItem"]> => ({
+    return items.map((item): Static<(typeof CompatTypes)["ShopItem"]> => ({
       ...item,
       id: String(item.id)
     }));
   }
 
   async devlogs(
-    data: Static<(typeof CPTypes)["DevlogParams"]>,
-  ): Promise<Static<(typeof CPTypes)["Devlogs"]> | null> {
+    data: Static<(typeof CompatTypes)["DevlogParams"]>,
+  ): Promise<Static<(typeof CompatTypes)["Devlogs"]> | null> {
     const items = await this.scraper.devlogs({
       id: Number(data.id),
       devlogId: Number(data.devlogId),
     });
     if (!items) return null;
-    return items.map((item): Static<(typeof CPTypes)["Devlog"]> => ({
+    return items.map((item): Static<(typeof CompatTypes)["Devlog"]> => ({
       ...item,
       id: String(item.id),
       posted: item.posted.toISOString()
@@ -46,8 +46,8 @@ export default class StardanceCP implements CPScraperAdapter {
   }
 
   async project(
-    data: Static<(typeof CPTypes)["ProjectParams"]>,
-  ): Promise<Static<(typeof CPTypes)["Project"]> | null> {
+    data: Static<(typeof CompatTypes)["ProjectParams"]>,
+  ): Promise<Static<(typeof CompatTypes)["Project"]> | null> {
     const item = await this.scraper.project({
       id: Number(data.id),
     });

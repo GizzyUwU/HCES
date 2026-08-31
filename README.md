@@ -11,14 +11,10 @@
   <p align="center">
       Scrapes Hack Club Events (rn only stardance and flavortown) to provide a API of data for each event with same schema for each API
     <br />
-    <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a>
+    <a href="https://hces.gizzy.gay/api/v1"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/othneildrew/Best-README-Template">View Demo</a>
-    &middot;
-    <a href="https://github.com/othneildrew/Best-README-Template/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
-    &middot;
-    <a href="https://github.com/othneildrew/Best-README-Template/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    <a href="https://hces.gizzy.gay">View the site</a>
   </p>
 </div>
 

@@ -1,8 +1,8 @@
 import type { Static } from "elysia";
-import type { CPTypes } from "./types";
+import type { CompatTypes } from "./types";
 
-export interface CPScraperAdapter {
-  project(data: Static<typeof CPTypes["ProjectParams"]>): Promise<Static<typeof CPTypes["Project"]> | null>;
-  shop(data?: Static<(typeof CPTypes)["ShopParams"]>): Promise<Static<typeof CPTypes["ShopItems"]> | null>;
-  devlogs(data: Static<typeof CPTypes["DevlogParams"]>): Promise<Static<typeof CPTypes["Devlogs"]> | null>;
+export interface CompatScraperAdapter {
+  project(data: Static<typeof CompatTypes["ProjectParams"]>): Promise<Static<typeof CompatTypes["Project"]> | null>;
+  shop(data?: Static<(typeof CompatTypes)["ShopParams"]>): Promise<Static<typeof CompatTypes["ShopItems"]> | null>;
+  devlogs(data: Static<typeof CompatTypes["DevlogParams"]>): Promise<Static<typeof CompatTypes["Devlogs"]> | null>;
 }

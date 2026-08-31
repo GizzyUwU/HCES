@@ -1,9 +1,9 @@
 import Elysia from "elysia";
 import { logger } from "@server/lib/utils";
 import { APIError } from "@server/lib/error";
-import StardanceCP from "@server/scrapers/stardance/cp";
+import StardanceCompat from "@server/scrapers/stardance/compat";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";
-import { CPTypes } from "@server/scrapers/compatibility/types";
+import { CompatTypes } from "@server/scrapers/compatibility/types";
 
 export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   "",
@@ -12,7 +12,7 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
       let cookie = headers["x-stardance-cookie"] ?? "";
       if (cookie.length > 0 && !cookie.startsWith("_stardance_session_4="))
         cookie = "_stardance_session_4=" + cookie;
-      const client = new StardanceCP({
+      const client = new StardanceCompat({
         logger,
         cookie,
         workerId: request.headers.get("x-hces-worker-id") ?? "",
@@ -40,10 +40,10 @@ export default new Elysia().use(dispatchGuard(["x-stardance-cookie"])).get(
   },
   {
     detail: {
-      tags: ["Compatability", "Stardance", "StardanceCP / Shop"],
+      tags: ["Compatability", "Stardance", "StardanceCompat / Shop"],
     },
     response: {
-      200: CPTypes["ShopItems"]
+      200: CompatTypes["ShopItems"]
     },
   },
 );
