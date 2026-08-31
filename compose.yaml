@@ -14,7 +14,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -fsS http://localhost:8000/healthcheck | jq -e '.okay == true' >/dev/null",
+          "curl -fsS http://localhost:8000/health | jq -e '.ok == true' >/dev/null",
         ]
       interval: 10s
       timeout: 2s
