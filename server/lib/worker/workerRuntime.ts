@@ -78,7 +78,7 @@ export function startRemoteWorker({
 }) {
   let reconnectDelay = 1000;
   const connect = () => {
-    const socket = new WebSocket(`${url.replace(/\/$/, "")}/ws/workers`, {
+    const socket = new WebSocket(`${url.replace(/\/$/, "")}/api/workers`, {
       headers: {
         Authorization: `Bearer ${secret}`,
         ...(version ? { "X-Worker-Version": version } : {}),

@@ -56,7 +56,7 @@ export const workerChannel = new Elysia({
 
     return { worker, workerVersion: headers["x-worker-version"] };
   })
-  .ws("/ws/workers", {
+  .ws("/api/workers", {
     open(ws) {
       const { id, label } = ws.data.worker;
       registerWorker(id, (data) => ws.send(data));
