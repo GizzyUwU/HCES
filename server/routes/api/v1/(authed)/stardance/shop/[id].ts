@@ -1,5 +1,5 @@
 import Elysia from "elysia";
-import { logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 import { APIError } from "@server/lib/error";
 import Stardance from "@server/scrapers/stardance";
 import { dispatchGuard } from "@server/routes/api/v1/(authed)/dispatchGuard";

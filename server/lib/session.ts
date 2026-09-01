@@ -1,6 +1,6 @@
 // lib/session.ts
-import { db } from "@server/lib/utils"
-import tables  from '@server/schema/index'
+import { db } from "@server/lib/db";
+import tables from '@server/schema/index'
 import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import type { Context } from "elysia";

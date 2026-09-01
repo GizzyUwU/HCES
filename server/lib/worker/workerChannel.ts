@@ -1,7 +1,8 @@
 import Elysia from "elysia";
 import { createHash } from "node:crypto";
 import { registerWorker, unregisterWorker, resolveJob } from "./workerPool";
-import { db, logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
+import { db } from "@server/lib/db";
 import { workers } from "@server/schema/workers";
 import { APIError } from "@server/lib/error";
 import bearer from "@elysia/bearer";

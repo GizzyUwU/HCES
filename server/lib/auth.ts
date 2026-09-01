@@ -4,13 +4,13 @@ import type {
   TOAuth2Provider,
   TOAuth2AccessToken,
 } from "@bogeychan/elysia-oauth2";
-import { db } from "@server/lib/utils";
+import { db } from "@server/lib/db";
 import { session, oauthToken, users } from "@server/schema/users";
 import { eq, and } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { getOrCreateSession, invalidateSession } from "@server/lib/session";
 import { APIError, UnverifiedAccountError } from "@server/lib/error";
-import { logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 
 function hackClubAuth(): TOAuth2Provider {
   if (!process.env["HCA_CLIENT_ID"] || !process.env["HCA_CLIENT_SECRET"])

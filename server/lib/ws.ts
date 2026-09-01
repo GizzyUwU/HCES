@@ -1,4 +1,4 @@
-import { logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 import Elysia from "elysia";
 import { z } from "zod";
 import { createHash } from "crypto";

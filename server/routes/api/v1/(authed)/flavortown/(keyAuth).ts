@@ -1,7 +1,7 @@
 import Elysia from "elysia";
 import { APIError } from "@server/lib/error";
 import { errorModel } from "@server/lib/errorModel";
-import { logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 import Flavortown from "@server/scrapers/flavortown";
 import FlavortownCompat from "@server/scrapers/flavortown/compat";
 export const flavortownKey = () =>

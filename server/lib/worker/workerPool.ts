@@ -1,5 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
-import { db, logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
+import { db } from "@server/lib/db";
 import prometheusRegistry from "@server/lib/metrics";
 import { workerStats } from "@server/schema/workerStats";
 import { eq } from "drizzle-orm";

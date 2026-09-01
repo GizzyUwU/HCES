@@ -1,5 +1,6 @@
 import Elysia, { t } from "elysia";
-import { db, logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
+import { db } from "@server/lib/db";
 import { getOrCreateSession } from "@server/lib/session";
 import { users } from "@server/schema/users";
 import { eq } from "drizzle-orm";

@@ -1,11 +1,11 @@
 import Elysia, { t } from "elysia";
-import { db } from "@server/lib/utils";
+import { db } from "@server/lib/db";
 import { authGuard } from "@server/routes/api/v1/web/(hcaAuthed)";
 import tables from "@server/schema";
 import { and, count, eq } from "drizzle-orm";
 import { createSelectSchema } from "drizzle-typebox";
 import { createHash, randomBytes } from "node:crypto";
-import { logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 import { APIError } from "@server/lib/error";
 import { invalidateApiKey, updateCacheApiKey } from "@server/lib/apiKeyCache";
 const _apiKeys = createSelectSchema(tables.apiKeys);

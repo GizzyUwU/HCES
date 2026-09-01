@@ -23,7 +23,7 @@ import { OpenPanel } from "@openpanel/sdk";
 import { preconnectScrapers } from "@server/scrapers/preconnect";
 import { join } from "node:path";
 import { Counter, Histogram } from "prom-client";
-import { db, logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -69,7 +69,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
   preconnectScrapers();
 } else {
   const { auth } = await import("@server/lib/auth");
-
+  const { db } = await import("@server/lib/db");
   await resetStaleConnections();
   const requestStartTimes = new WeakMap<Request, number>();
   const httpRequests = new Counter({

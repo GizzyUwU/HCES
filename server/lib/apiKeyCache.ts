@@ -1,4 +1,5 @@
-import { db, logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
+import { db } from "./db";
 import { apiKeys } from "@server/schema/apiKeys";
 import { eq, inArray } from "drizzle-orm";
 

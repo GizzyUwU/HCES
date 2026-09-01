@@ -2,7 +2,7 @@ import Elysia from "elysia";
 import { APIError } from "@server/lib/error";
 import { errorModel } from "@server/lib/errorModel";
 import Stardance from "@server/scrapers/stardance";
-import { logger } from "@server/lib/utils";
+import { logger } from "@server/lib/logger";
 export const stardanceCookie = () =>
   new Elysia({ name: "stardanceCookie" })
     .resolve(async ({ headers, request }) => {
