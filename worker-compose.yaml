@@ -3,8 +3,9 @@ services:
     build:
       context: .
     env_file: .env
-    extra_hosts:
+    environment:
       - WORKER=true
+    extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
     healthcheck:
