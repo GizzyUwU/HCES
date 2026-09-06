@@ -131,9 +131,12 @@ export default class Stardance {
         const title = item.find(".shop-item-card__title").text();
         const description = item.find(".shop-item-card__description p").text();
         const image = item.find(".shop-item-card__image").attr("src") ?? "";
-        const avgHoursVal = [...item.find(".shop-item-card__hours").text().matchAll(
-          /(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/g,
-        )].map((match) => {
+        const avgHoursVal = [
+          ...item
+            .find(".shop-item-card__hours")
+            .text()
+            .matchAll(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/g),
+        ].map((match) => {
           const value = Number(match[1]);
           return /minutes?|mins?/.test(match[2] ?? "") ? value / 60 : value;
         });
@@ -144,13 +147,16 @@ export default class Stardance {
         const price = parseNum(item.attr("data-price") ?? "0");
         const requirements =
           item.find(".shop-item-card__achievement-names").text() ?? null;
-        const rawStock = item.find(".shop-item-card__stock-badge").text().trim();
+        const rawStock = item
+          .find(".shop-item-card__stock-badge")
+          .text()
+          .trim();
         const stock =
           rawStock === ""
-            ? null :
-          rawStock === "Out of stock"
-            ? 0
-            : parseNum(rawStock.replace(/\s+left$/, ""));
+            ? null
+            : rawStock === "Out of stock"
+              ? 0
+              : parseNum(rawStock.replace(/\s+left$/, ""));
         const regions = Object.fromEntries(
           (item.attr("data-regions") ?? "")
             .split(",")
@@ -180,19 +186,21 @@ export default class Stardance {
     return rows.map((bRow) => {
       const row = $(bRow);
       const cells = row.find("td");
-      const reviewer = cells.eq(1).find("a").text();
-      const devlogsLastThreeDays = Number(cells.eq(2).text());
-      const lockedInQuota = Number(
+      const reviewer = cells.eq(1).find("a").text().trim();
+      const devlogsLastThreeDays = Number(cells.eq(2).text().trim());
+      const lockedInSoFarThisWeek = Number(
         cells.eq(3).text().replace(/\s+/g, " ").trim(),
       );
-      const projectsReviewedLastThreeDays = Number(cells.eq(4).text());
-      const stardustEarnt = Number(cells.eq(5).text());
+      const projectsReviewedToday = Number(cells.eq(4).text().trim());
+      const projectsReviewedLastThreeDays = Number(cells.eq(5).text().trim());
+      const stardustEarnt = Number(cells.eq(6).text().trim());
       const lockedInStatus = row.hasClass("ysws-dashboard__row--on-pace");
       return {
         reviewer,
         devlogsLastThreeDays,
         lockedInStatus,
-        lockedInQuota,
+        lockedInSoFarThisWeek,
+        projectsReviewedToday,
         projectsReviewedLastThreeDays,
         stardustEarnt,
       };
@@ -245,86 +253,115 @@ export default class Stardance {
   ): Promise<Static<(typeof SDTypes)["GoiStats"]>["personalStats"]> {
     const container = $(".ysws-dashboard__progress-stats");
     const stats = container.find(".ysws-dashboard__progress-stat").toArray();
-    let certifiedHours = 0,
-      streak = 0,
-      shareThisWeek = 0,
-      diffPplProjectsReviewed = 0
-
-    let bestDay: {
-      devlogCount: number;
-      date: string;
-    } = {
+  
+    let devlogsPerDayThisWeek = 0;
+    let projectsPerDayThisWeek = 0;
+    let numberNeededToTodaysGoal: number | null = null;
+    let certifiedHours = 0;
+    let diffPplProjectsReviewed = 0;
+    let projectsToday = 0;
+    let shareThisWeek = 0;
+  
+    let bestDay = {
       devlogCount: 0,
       date: "",
     };
-
-    let rankThisWeek: {
-      rank: number;
-      totalPpl: number;
-    } = {
+  
+    let rankThisWeek = {
       rank: 0,
-      totalPpl: 0
+      totalPpl: 0,
     };
-
+  
+    const hero = $(".ysws-dashboard__progress-hero");
+    const paceCounts = hero.find(
+      ".ysws-dashboard__progress-paces .ysws-dashboard__progress-count",
+    );
+  
+    devlogsPerDayThisWeek = parseNum(paceCounts.eq(0).text());
+    projectsPerDayThisWeek = parseNum(paceCounts.eq(1).text());
+  
+    const goalMatch = hero
+      .find(".ysws-dashboard__progress-note")
+      .text()
+      .trim()
+      .match(/\d+/);
+  
+    numberNeededToTodaysGoal = goalMatch
+      ? parseNum(goalMatch[0])
+      : null;
+  
     for (const bStat of stats) {
       const stat = $(bStat);
       const label = stat.find(".ysws-dashboard__progress-stat-label").text();
       const value = stat.find(".ysws-dashboard__progress-stat-value").text();
       const note = stat.find(".ysws-dashboard__progress-stat-note").text();
+  
       switch (label) {
         case "Hours certified":
           certifiedHours = parseNum(value);
           break;
-        case "People's projects you've reviewed":
+  
+        case "People reviewed":
           diffPplProjectsReviewed = parseNum(value);
           break;
-        case "Day streak":
-          streak = parseNum(value);
+  
+        case "Projects today":
+          projectsToday = parseNum(value);
           break;
+  
         case "Best day": {
           bestDay.devlogCount = parseNum(value);
-          const date = note.match(/set (\S+)/);
-          bestDay.date = String(date ? date[1] : "");
+          bestDay.date = String(note.match(/set (\S+)/)?.[1] ?? "");
           break;
         }
+  
         case "Share this week":
           shareThisWeek = parseNum(value.replace(/%/g, ""));
           break;
+  
         case "Rank this week":
           rankThisWeek.rank = parseNum(value.replace(/^#/, ""));
-          rankThisWeek.totalPpl = parseNum(note.match(/of (\d+) reviewers/)?.[1] ?? "0");
+          rankThisWeek.totalPpl = parseNum(
+            note.match(/of (\d+) reviewers/)?.[1] ?? "0",
+          );
           break;
+  
         default:
           break;
       }
     }
-
+  
     const tierNote = $(".ysws-dashboard__progress-tier-note").text();
     const allTimeDevlogs = parseNum(
       $(".ysws-dashboard__progress-tier-note strong").text(),
     );
+  
     const devlogsTillMorePayMatch = tierNote.match(/(\d+)\s+mores?/);
     const devlogsTillMorePay = devlogsTillMorePayMatch
-      ? parseNum(String(devlogsTillMorePayMatch[1]))
+      ? parseNum(devlogsTillMorePayMatch[1] ?? "")
       : null;
-
+  
     const currentPayMatch = tierNote.match(/up from ([\d.]+)/);
     const currentPay = currentPayMatch
-      ? parseNum(String(currentPayMatch[1]))
+      ? parseNum(currentPayMatch[1] ?? "")
       : 0;
+  
     return {
-      certifiedHours,
-      diffPplProjectsReviewed,
-      streak,
-      bestDay,
+      devlogsPerDayThisWeek,
+      projectsPerDayThisWeek,
+      numberNeededToTodaysGoal,
       shareThisWeek,
       rankThisWeek,
+      projectsToday,
+      bestDay,
       allTimeDevlogs,
       devlogsTillMorePay,
       currentPay,
+      certifiedHours,
+      diffPplProjectsReviewed,
     };
   }
-
+  
   async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
@@ -353,15 +390,6 @@ export default class Stardance {
       const lbRows = $(".ysws-dashboard__table tbody tr").toArray();
       const reviewerLb = await this.goiReviewerLb($, lbRows);
       const graph = await this.goiReviewerGraph($);
-      const hero = $(".ysws-dashboard__progress-hero");
-      const devlogsPerDayThisWeek = Number(
-        hero.find(".ysws-dashboard__progress-count").text(),
-      );
-      const goalMatch = hero
-        .find(".ysws-dashboard__progress-note")
-        .text()
-        .trim()
-        .match(/\d+/);
       const personalStats = await this.goiPersonalStats($);
       const myUsername = $(".sidebar__user-meta-handle")
         .text()
@@ -372,8 +400,6 @@ export default class Stardance {
         myUsername,
         reviewerLb,
         graph,
-        devlogsPerDayThisWeek,
-        numberNeededToTodaysGoal: goalMatch ? Number(goalMatch[0]) : null,
         personalStats,
       };
     } catch (err: any) {

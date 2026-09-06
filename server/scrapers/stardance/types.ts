@@ -2,12 +2,16 @@ import { t } from "elysia";
 import { Duration, Nullable } from "@server/scrapers/typeUtils";
 export namespace SDTypes {
   export const ShopParams = t.Object({
-    id: t.Optional(t.Number({
-      description: "Item ID",
-    })),
-    category: t.Optional(t.String({
-      description: "Category to look at"
-    }))
+    id: t.Optional(
+      t.Number({
+        description: "Item ID",
+      }),
+    ),
+    category: t.Optional(
+      t.String({
+        description: "Category to look at",
+      }),
+    ),
   });
   export const ShopItem = t.Object({
     id: t.Number(),
@@ -17,7 +21,7 @@ export namespace SDTypes {
     }),
     description: t.String(),
     avgHours: t.Number({
-      minimum: 0
+      minimum: 0,
     }),
     price: t.Number({ exclusiveMinimum: -Infinity }),
     stock: Nullable(t.Number()),
@@ -35,7 +39,8 @@ export namespace SDTypes {
         reviewer: t.String(),
         devlogsLastThreeDays: t.Number(),
         lockedInStatus: t.Boolean(),
-        lockedInQuota: t.Number(),
+        lockedInSoFarThisWeek: t.Number(),
+        projectsReviewedToday: t.Number(),
         projectsReviewedLastThreeDays: t.Number(),
         stardustEarnt: t.Number(),
       }),
@@ -49,15 +54,16 @@ export namespace SDTypes {
         }),
       ),
     }),
-    devlogsPerDayThisWeek: t.Number(),
-    numberNeededToTodaysGoal: Nullable(t.Number()),
     personalStats: t.Object({
+      devlogsPerDayThisWeek: t.Number(),
+      projectsPerDayThisWeek: t.Number(),
+      numberNeededToTodaysGoal: Nullable(t.Number()),
       shareThisWeek: t.Number(),
       rankThisWeek: t.Object({
         rank: t.Number(),
-        totalPpl: t.Number()
+        totalPpl: t.Number(),
       }),
-      streak: t.Number(),
+      projectsToday: t.Number(),
       bestDay: t.Object({
         devlogCount: t.Number(),
         date: t.String(),
@@ -66,7 +72,7 @@ export namespace SDTypes {
       devlogsTillMorePay: Nullable(t.Number()),
       currentPay: t.Number(),
       certifiedHours: t.Number(),
-      diffPplProjectsReviewed: t.Number()
+      diffPplProjectsReviewed: t.Number(),
     }),
   });
 
