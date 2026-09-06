@@ -157,7 +157,29 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       set.headers["content-type"] = prometheusRegistry.contentType;
       return prometheusRegistry.metrics();
     })
-    .onError(async ({ error, set, cookie }) => {
+    .onError(async ({ code, request, error, set, cookie }) => {
+      const url = new URL(request.url);
+
+      if (code === "VALIDATION") {
+        const validation = error.all?.[0] ?? error;
+    
+        const details = {
+          path: "path" in validation ? validation.path : undefined,
+          message: "message" in validation ? validation.message : error.message,
+          value: "value" in validation ? validation.value : undefined,
+        };
+      
+        logger.error(
+          `[VALIDATION] ${request.method} ${url.pathname} ${set.status}`, {
+            details
+          }
+        );
+
+        set.status = 500;
+        return {
+          err: { status: 500, msg: "Internal server error" },
+        };
+      }
       if (error instanceof UnverifiedAccountError) {
         const sessionId = cookie["sid"]?.value;
 
