@@ -497,7 +497,20 @@ export default class Stardance {
           }
         }
       }
+
+      const categories = main("#filter-type option")
+        .map((_, option) => {
+          const text = main(option).text().trim();
+          const match = text.match(/^(.+?)\s*\(([\d,]+)\)$/);
       
+          if (!match) return null;
+      
+          return {
+            type: match[1]!.trim(),
+            count: parseNum(match[2]!),
+          };
+        })
+        .get();
   
       return {
         myUsername,
@@ -508,6 +521,7 @@ export default class Stardance {
         pendingHours,
         pendingDevlogs,
         oldestInQueue: oldestInQueue.toISOString().slice(0, 10),
+        categories
       };
     } catch (err: any) {
       return null;

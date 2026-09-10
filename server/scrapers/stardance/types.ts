@@ -49,6 +49,14 @@ export namespace SDTypes {
     oldestInQueue: t.String({
       format: "date"
     }),
+    categories: t.Array(
+      t.Object({
+        type: t.String(),
+        count: t.Number({
+          minimum: 0,
+        }),
+      }),
+    ),
     reviewerLb: t.Array(
       t.Object({
         reviewer: t.String(),
