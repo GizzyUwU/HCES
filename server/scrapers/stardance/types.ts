@@ -34,6 +34,21 @@ export namespace SDTypes {
 
   export const GoiStats = t.Object({
     myUsername: t.String(),
+    queueCount: t.Number({
+      description: "Count of pending projects in the queue",
+      minimum: 0,
+    }),
+    pendingHours: t.Number({
+      description: "Total pending hours in queue",
+      minimum: 0,
+    }),
+    pendingDevlogs: t.Number({
+      description: "Total pending devlogs in queue",
+      minimum: 0,
+    }),
+    oldestInQueue: t.String({
+      format: "date"
+    }),
     reviewerLb: t.Array(
       t.Object({
         reviewer: t.String(),
@@ -46,11 +61,15 @@ export namespace SDTypes {
       }),
     ),
     graph: t.Object({
-      dates: t.Array(t.String()),
-      reviewers: t.Array(
+      dates: t.Array(
         t.Object({
-          reviewer: t.String(),
-          reviews: t.Number(),
+          date: t.String(),
+          reviewers: t.Array(
+            t.Object({
+              reviewer: t.String(),
+              reviews: t.Number(),
+            }),
+          ),
         }),
       ),
     }),

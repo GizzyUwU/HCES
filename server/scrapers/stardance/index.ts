@@ -214,11 +214,12 @@ export default class Stardance {
     const rawGraph = graph.attr(
       "data-certification--ysws--reviewer-chart-chart-value",
     );
+  
     if (!rawGraph) {
       this.logger.warn("GOI reviewer chart data attribute is missing.");
-      return { dates: [], reviewers: [] };
+      return { dates: [] };
     }
-
+  
     let parsed: {
       labels: string[];
       series: {
@@ -226,28 +227,34 @@ export default class Stardance {
         data: number[];
       }[];
     };
-
+  
     try {
       parsed = JSON.parse(rawGraph);
     } catch (err) {
       this.logger.warn("GOI reviewer chart data failed to parse", {
         error: err,
       });
-      return { dates: [], reviewers: [] };
+      return { dates: [] };
     }
-
-    const dates = parsed.labels ?? [];
-    const reviewers = (parsed.series ?? []).map((s) => ({
-      reviewer: s.name,
-      reviews: s.data.reduce((sum, n) => sum + n, 0),
+  
+    const labels = parsed.labels ?? [];
+    const series = parsed.series ?? [];
+  
+    const dates = labels.map((date, dateIndex) => ({
+      date,
+      reviewers: series
+        .map((series) => ({
+          reviewer: series.name,
+          reviews: series.data[dateIndex] ?? 0,
+        }))
+        .filter((reviewer) => reviewer.reviews > 0),
     }));
-
+  
     return {
       dates,
-      reviewers,
     };
   }
-
+  
   private async goiPersonalStats(
     $: CheerioAPI,
   ): Promise<Static<(typeof SDTypes)["GoiStats"]>["personalStats"]> {
@@ -365,18 +372,30 @@ export default class Stardance {
   async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
+  
     try {
-      const res = await this.request("/admin/certification/review/dashboard");
-      const html = await res.text();
+      const [res, resMainPage] = await Promise.all([
+        this.request("/admin/certification/review/dashboard"),
+        this.request(
+          "/admin/certification/review?sort=length&dir=asc&search=&with_integrity=0&project_type=",
+        ),
+      ]);
+  
+      const [html, htmlMain] = await Promise.all([
+        res.text(),
+        resMainPage.text(),
+      ]);
+  
       this.lastCode = res.status;
-      if (!(
-        typeof html === "string" &&
-        (
+  
+      if (
+        typeof html !== "string" ||
+        !(
           String(res.headers.get("content-type")) ??
           String(res.headers.get("Content-Type")) ??
           ""
         ).includes("text/html")
-      )) {
+      ) {
         this.logger.warn("GOI Stats endpoint didn't return HTML", {
           contentType:
             String(res.headers.get("Content-Type")) ??
@@ -386,21 +405,109 @@ export default class Stardance {
         });
         return null;
       }
+  
+      if (
+        typeof htmlMain !== "string" ||
+        !(
+          String(resMainPage.headers.get("content-type")) ??
+          String(resMainPage.headers.get("Content-Type")) ??
+          ""
+        ).includes("text/html")
+      ) {
+        this.logger.warn("GOI Stats main page endpoint didn't return HTML", {
+          contentType:
+            String(resMainPage.headers.get("Content-Type")) ??
+            String(resMainPage.headers.get("content-type")) ??
+            "",
+          status: resMainPage.status,
+        });
+        return null;
+      }
+  
       const $ = load(html);
+      const main = load(htmlMain);
+  
       const lbRows = $(".ysws-dashboard__table tbody tr").toArray();
       const reviewerLb = await this.goiReviewerLb($, lbRows);
       const graph = await this.goiReviewerGraph($);
       const personalStats = await this.goiPersonalStats($);
+  
       const myUsername = $(".sidebar__user-meta-handle")
         .text()
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^@/, "");
+  
+      const queueCount = Number(
+        main(".ysws-queue__summary-total .ysws-queue__summary-count")
+          .text()
+          .trim(),
+      );
+
+      const queueRows = main("table tbody tr").toArray();
+      let pendingHours = 0;
+      let pendingDevlogs = 0;
+      let oldestInQueue = new Date();
+      
+      for (const bRow of queueRows) {
+        const row = main(bRow);
+      
+        const hours = Number(
+          row
+            .find('td[data-label="Hours"]')
+            .text()
+            .trim()
+            .match(/[\d.]+/)?.[0] ?? 0,
+        );
+      
+        const devlogs = Number(
+          row.find('td[data-label="pending devlogs"]').text().trim() || 0,
+        );
+      
+        const ageText = row.find('td[data-label="Age"]').text().trim();
+      
+        pendingHours += hours;
+        pendingDevlogs += devlogs;
+      
+        const ageMatch = ageText.match(
+          /(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/i,
+        );
+      
+        if (ageMatch) {
+          const amount = Number(ageMatch[1]);
+          const unit = ageMatch[2]?.toLowerCase();
+      
+          const ageMs =
+            unit === "minute"
+              ? amount * 60 * 1000
+              : unit === "hour"
+                ? amount * 60 * 60 * 1000
+                : unit === "day"
+                  ? amount * 24 * 60 * 60 * 1000
+                  : unit === "week"
+                    ? amount * 7 * 24 * 60 * 60 * 1000
+                    : unit === "month"
+                      ? amount * 30 * 24 * 60 * 60 * 1000
+                      : amount * 365 * 24 * 60 * 60 * 1000;
+      
+          const date = new Date(Date.now() - ageMs);
+      
+          if (date < oldestInQueue) {
+            oldestInQueue = date;
+          }
+        }
+      }
+      
+  
       return {
         myUsername,
         reviewerLb,
         graph,
         personalStats,
+        queueCount,
+        pendingHours,
+        pendingDevlogs,
+        oldestInQueue: oldestInQueue.toISOString().slice(0, 10),
       };
     } catch (err: any) {
       return null;
