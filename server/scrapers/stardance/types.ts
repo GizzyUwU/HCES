@@ -32,6 +32,22 @@ export namespace SDTypes {
   });
   export const ShopItems = t.Array(ShopItem);
 
+  export const QueueCategoryStats = t.Object({
+    type: t.String(),
+    count: t.Number({
+      minimum: 0,
+    }),
+    pendingHours: t.Number({
+      minimum: 0,
+    }),
+    pendingDevlogs: t.Number({
+      minimum: 0,
+    }),
+    oldestInQueue: t.String({
+      format: "date"
+    }),
+  });
+
   export const GoiStats = t.Object({
     myUsername: t.String(),
     queueCount: t.Number({
@@ -49,14 +65,7 @@ export namespace SDTypes {
     oldestInQueue: t.String({
       format: "date"
     }),
-    categories: t.Array(
-      t.Object({
-        type: t.String(),
-        count: t.Number({
-          minimum: 0,
-        }),
-      }),
-    ),
+    categories: t.Array(QueueCategoryStats),
     reviewerLb: t.Array(
       t.Object({
         reviewer: t.String(),

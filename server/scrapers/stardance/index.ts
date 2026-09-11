@@ -448,6 +448,12 @@ export default class Stardance {
       let pendingHours = 0;
       let pendingDevlogs = 0;
       let oldestInQueue = new Date();
+      const categoryMap = new Map<string, {
+        count: number;
+        pendingHours: number;
+        pendingDevlogs: number;
+        oldestInQueue: Date;
+      }>();
       
       for (const bRow of queueRows) {
         const row = main(bRow);
@@ -465,6 +471,7 @@ export default class Stardance {
         );
       
         const ageText = row.find('td[data-label="Age"]').text().trim();
+        const type = row.find('td[data-label="Type"]').text().trim() || "Unknown";
       
         pendingHours += hours;
         pendingDevlogs += devlogs;
@@ -473,6 +480,7 @@ export default class Stardance {
           /(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/i,
         );
       
+        let date: Date | null = null;
         if (ageMatch) {
           const amount = Number(ageMatch[1]);
           const unit = ageMatch[2]?.toLowerCase();
@@ -490,27 +498,35 @@ export default class Stardance {
                       ? amount * 30 * 24 * 60 * 60 * 1000
                       : amount * 365 * 24 * 60 * 60 * 1000;
       
-          const date = new Date(Date.now() - ageMs);
+          date = new Date(Date.now() - ageMs);
       
           if (date < oldestInQueue) {
             oldestInQueue = date;
           }
         }
+      
+        const cat = categoryMap.get(type) ?? {
+          count: 0,
+          pendingHours: 0,
+          pendingDevlogs: 0,
+          oldestInQueue: new Date(),
+        };
+        cat.count += 1;
+        cat.pendingHours += hours;
+        cat.pendingDevlogs += devlogs;
+        if (date && date < cat.oldestInQueue) {
+          cat.oldestInQueue = date;
+        }
+        categoryMap.set(type, cat);
       }
 
-      const categories = main("#filter-type option")
-        .map((_, option) => {
-          const text = main(option).text().trim();
-          const match = text.match(/^(.+?)\s*\(([\d,]+)\)$/);
-      
-          if (!match) return null;
-      
-          return {
-            type: match[1]!.trim(),
-            count: parseNum(match[2]!),
-          };
-        })
-        .get();
+      const categories = [...categoryMap.entries()].map(([type, cat]) => ({
+        type,
+        count: cat.count,
+        pendingHours: cat.pendingHours,
+        pendingDevlogs: cat.pendingDevlogs,
+        oldestInQueue: cat.oldestInQueue.toISOString().slice(0, 10),
+      }));
   
       return {
         myUsername,
