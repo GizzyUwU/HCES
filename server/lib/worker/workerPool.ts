@@ -121,6 +121,23 @@ function prune(
 }
 
 let localWorker = "";
+
+export function getConnectedCount(): number {
+  const ids = new Set<string>(workers.keys());
+  if (localWorker.length > 0) ids.add(localWorker);
+  return ids.size;
+}
+
+export function getPendingCount(): number {
+  return pending.size;
+}
+
+export function getConnectedIds(): string[] {
+  const ids = new Set<string>(workers.keys());
+  if (localWorker.length > 0) ids.add(localWorker);
+  return Array.from(ids);
+}
+
 export async function enableLocalWorker(key: string, versionSHA: string) {
   const hash = createHash("sha256").update(key).digest("hex");
   const local = await db

@@ -11,6 +11,19 @@ const lastCheese = new Map<string, number>();
 const iWantToTimers = new Map<string, ReturnType<typeof setInterval>>();
 const sockets = new Map<string, { close: () => void }>();
 
+export function getStaleWorkerIds(now = Date.now()): string[] {
+  const out: string[] = [];
+  for (const [id, ts] of lastCheese) {
+    if (now - ts > 45 * 1000) out.push(id);
+  }
+  return out;
+}
+
+export function getLastCheeseAge(id: string, now = Date.now()): number | null {
+  const ts = lastCheese.get(id);
+  return ts == null ? null : now - ts;
+}
+
 function markDead(id: string) {
   const timer = iWantToTimers.get(id);
   if (timer) clearInterval(timer);

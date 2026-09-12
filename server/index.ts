@@ -24,6 +24,7 @@ import { preconnectScrapers } from "@server/scrapers/preconnect";
 import { join } from "node:path";
 import { Counter, Histogram } from "prom-client";
 import { logger } from "@server/lib/logger";
+import { shallowHealth, deepHealth } from "@server/lib/health";
 if (process.env["WORKER"] && !process.env["WORKER_KEY"])
   throw new Error("WORKER_KEY required to be a worker");
 
@@ -295,10 +296,16 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
           },
         }),
     )
-    .get("/health", () => ({
-      ok: true,
-      mode: "orchestrator",
-    }))
+    .get("/health", ({ set }) => {
+      set.headers["cache-control"] = "no-store";
+      return shallowHealth();
+    })
+    .get("/health/deep", async ({ set }) => {
+      const result = await deepHealth();
+      set.headers["cache-control"] = "no-store";
+      set.status = result.status === "healthy" ? 200 : 503;
+      return result;
+    })
     .listen(process.env["PORT"] || 8000, ({ url }) =>
       console.log(`Server is running on ${url}`),
     );
