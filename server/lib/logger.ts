@@ -1,4 +1,9 @@
-import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
+import {
+  configure,
+  getConsoleSink,
+  getLogger,
+  getTextFormatter,
+} from "@logtape/logtape";
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as Sentry from "@sentry/bun";
 import { getSentrySink } from "@logtape/sentry";
@@ -14,6 +19,14 @@ if (process.env["SENTRY_DSN"]) {
         : "development",
     tracesSampleRate: 0.01,
   });
+
+  const role =
+    process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]
+      ? "remote_worker"
+      : process.env["WORKER"]
+        ? "bundled_worker_orchestrator"
+        : "orchestrator";
+  Sentry.setTag("node_role", role);
 }
 
 const logLevel = {
@@ -26,7 +39,12 @@ const logLevel = {
 } as const;
 
 await configure({
-  sinks: { console: getConsoleSink(), sentry: getSentrySink() },
+  sinks: {
+    console: getConsoleSink({
+      formatter: getTextFormatter({ timestamp: "time", level: "ABBR" }),
+    }),
+    sentry: getSentrySink({ breadcrumbs: true }),
+  },
   filters: {
     notExpectedClientError: (record) =>
       !(
@@ -48,6 +66,7 @@ await configure({
         "console",
         ...(process.env["SENTRY_DSN"] ? (["sentry"] as const) : []),
       ],
+      filters: ["notExpectedClientError"],
       lowestLevel:
         logLevel[Number(process.env["LOG_LEVEL"]) as keyof typeof logLevel] ??
         "info",

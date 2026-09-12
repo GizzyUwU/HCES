@@ -1,5 +1,18 @@
 import { workerApp } from "@server/lib/workerApp";
 import { logger } from "@server/lib/logger";
+import * as Sentry from "@sentry/bun";
+
+const workerLabels = new Map<string, string>();
+let workerIdentity: { id: string; label: string; prefix: string } | null = null;
+
+export function setWorkerLabel(id: string, label: string) {
+  workerLabels.set(id, label);
+}
+
+export function getWorkerLabel(id: string): string | undefined {
+  return workerLabels.get(id);
+}
+
 export type JobMessage = {
   type: "job";
   id: string;
@@ -52,6 +65,8 @@ export async function handleJob(msg: JobMessage, send: (data: string) => void) {
   } catch (err) {
     logger.error("worker job failed", {
       path: msg.path,
+      workerId: msg.workerId,
+      workerLabel: workerLabels.get(msg.workerId),
       error: err,
     });
     send(
@@ -92,7 +107,10 @@ export function startRemoteWorker({
     });
 
     socket.addEventListener("message", (event) => {
-      let msg: JobMessage | { type: "i_want_to" };
+      let msg: JobMessage | { type: "i_want_to" } | {
+        type: "welcome";
+        worker: { id: string; label: string; prefix: string };
+      };
       try {
         msg = JSON.parse(event.data as string);
       } catch {
@@ -102,20 +120,46 @@ export function startRemoteWorker({
         socket.send(JSON.stringify({ type: "_cheese" }));
         return;
       }
+      if (msg.type === "welcome") {
+        workerIdentity = msg.worker;
+        setWorkerLabel(msg.worker.id, msg.worker.label);
+        Sentry.setTag("worker_id", msg.worker.id);
+        Sentry.setTag("worker_label", msg.worker.label);
+        Sentry.setTag("worker_prefix", msg.worker.prefix);
+        Sentry.setTag("node_role", "remote_worker");
+        logger.info("worker identity received", msg.worker);
+        void Sentry.flush(1000);
+        return;
+      }
       if (msg.type !== "job") return;
       void handleJob(msg, (data) => socket.send(data));
     });
 
-    socket.addEventListener("close", () => {
-      logger.warn("uhm i disconnected from orchestrator ill try to reconnect", {
-        in: reconnectDelay,
+    socket.addEventListener("close", (event) => {
+      const closeEvent = event as CloseEvent;
+      logger.warn("worker websocket closed, reconnecting", {
+        url,
+        reconnectDelay,
+        code: closeEvent.code,
+        reason: closeEvent.reason,
+        wasClean: closeEvent.wasClean,
+        workerId: workerIdentity?.id,
+        workerLabel: workerIdentity?.label,
       });
       setTimeout(connect, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay * 2, 30 * 1000);
     });
 
-    socket.addEventListener("error", (err) => {
-      logger.error("socket error", { error: err });
+    socket.addEventListener("error", (event) => {
+      const error = (event as ErrorEvent)?.error ?? null;
+      logger.error("worker websocket error", {
+        error: error instanceof Error ? error : undefined,
+        url,
+        reconnectDelay,
+        readyState: socket.readyState,
+        workerId: workerIdentity?.id,
+        workerLabel: workerIdentity?.label,
+      });
     });
   };
 

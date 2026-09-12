@@ -8,6 +8,7 @@ import { workers as workersSchema } from "@server/schema/workers";
 import { createHash } from "node:crypto";
 import {
   handleJob,
+  setWorkerLabel,
   type HandleJobResult,
   type JobMessage,
 } from "./workerRuntime";
@@ -148,24 +149,27 @@ export async function enableLocalWorker(key: string, versionSHA: string) {
       versionSHA,
     })
     .where(eq(workersSchema.keyHash, hash))
-    .returning({ id: workersSchema.id })
+    .returning({ id: workersSchema.id, label: workersSchema.label })
     .catch((err) => {
       logger.error("failed to update local worker with connection info", {
         err,
       });
-      return [] as { id: string }[];
+      return [] as { id: string; label: string }[];
     });
   if (!local[0]) {
     logger.warn("Failed finding local worker's key id so disabling it");
     return;
   }
   localWorker = local[0].id;
-  logger.info("Local worker enabled");
+  setWorkerLabel(localWorker, local[0].label);
+  logger.info("Local worker enabled", {
+    id: localWorker,
+    label: local[0].label,
+  });
 
   registerWorker(localWorker, (data) => {
     const msg = JSON.parse(data) as JobMessage;
     if (msg.type !== "job") return;
-    console.log("aaa")
     void handleJob(msg, (data) => {
       const result = JSON.parse(data) as HandleJobResult;
       resolveJob(result.id, {

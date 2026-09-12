@@ -1,6 +1,7 @@
 import Elysia from "elysia";
 import { createHash } from "node:crypto";
 import { registerWorker, unregisterWorker, resolveJob } from "./workerPool";
+import { setWorkerLabel } from "./workerRuntime";
 import { logger } from "@server/lib/logger";
 import { db } from "@server/lib/db";
 import { workers } from "@server/schema/workers";
@@ -75,6 +76,17 @@ export const workerChannel = new Elysia({
       const { id, label } = ws.data.worker;
       registerWorker(id, (data) => ws.send(data));
       sockets.set(id, ws);
+      setWorkerLabel(id, label);
+      ws.send(
+        JSON.stringify({
+          type: "welcome",
+          worker: {
+            id: ws.data.worker.id,
+            label: ws.data.worker.label,
+            prefix: ws.data.worker.prefix,
+          },
+        }),
+      );
 
       lastCheese.set(id, Date.now());
       iWantToTimers.set(
