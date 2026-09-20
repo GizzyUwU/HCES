@@ -1,5 +1,6 @@
 services:
   hces:
+    image: hces:latest
     build:
       context: .
     env_file: .env
@@ -20,6 +21,7 @@ services:
       start_period: 10s
 
   hces_frontend:
+    image: hces-frontend:latest
     build:
       context: .
       dockerfile: Frontend.Dockerfile
