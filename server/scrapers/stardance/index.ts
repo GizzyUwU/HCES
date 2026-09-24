@@ -327,7 +327,11 @@ export default class Stardance {
           break;
   
         case "Rank this week":
-          rankThisWeek.rank = parseNum(value.replace(/^#/, ""));
+          rankThisWeek.rank =
+            value === "—" || value === "-" || value === "–"
+              ? 0
+              : parseNum(value.replace(/^#/, ""));
+
           rankThisWeek.totalPpl = parseNum(
             note.match(/of (\d+) reviewers/)?.[1] ?? "0",
           );
