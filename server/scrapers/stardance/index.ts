@@ -441,26 +441,38 @@ export default class Stardance {
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^@/, "");
-  
-      const queueCount = Number(
-        main(".ysws-queue__summary-total .ysws-queue__summary-count")
-          .text()
-          .trim(),
-      );
 
       const queueRows = main("table tbody tr").toArray();
+      
+      let queueCount = 0;
       let pendingHours = 0;
       let pendingDevlogs = 0;
       let oldestInQueue = new Date();
-      const categoryMap = new Map<string, {
-        count: number;
-        pendingHours: number;
-        pendingDevlogs: number;
-        oldestInQueue: Date;
-      }>();
+      
+      const categoryMap = new Map<
+        string,
+        {
+          count: number;
+          pendingHours: number;
+          pendingDevlogs: number;
+          oldestInQueue: Date;
+        }
+      >();
       
       for (const bRow of queueRows) {
         const row = main(bRow);
+      
+        const integrity = row
+          .find('td[data-label="Integrity"]')
+          .text()
+          .trim()
+          .toLowerCase();
+      
+        if (integrity === "fraud") {
+          continue;
+        }
+      
+        queueCount += 1;
       
         const hours = Number(
           row
@@ -475,7 +487,8 @@ export default class Stardance {
         );
       
         const ageText = row.find('td[data-label="Age"]').text().trim();
-        const type = row.find('td[data-label="Type"]').text().trim() || "Unknown";
+        const type =
+          row.find('td[data-label="Type"]').text().trim() || "Unknown";
       
         pendingHours += hours;
         pendingDevlogs += devlogs;
@@ -485,6 +498,7 @@ export default class Stardance {
         );
       
         let date: Date | null = null;
+      
         if (ageMatch) {
           const amount = Number(ageMatch[1]);
           const unit = ageMatch[2]?.toLowerCase();
@@ -515,12 +529,15 @@ export default class Stardance {
           pendingDevlogs: 0,
           oldestInQueue: new Date(),
         };
+      
         cat.count += 1;
         cat.pendingHours += hours;
         cat.pendingDevlogs += devlogs;
+      
         if (date && date < cat.oldestInQueue) {
           cat.oldestInQueue = date;
         }
+      
         categoryMap.set(type, cat);
       }
 
