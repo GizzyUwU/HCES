@@ -468,7 +468,7 @@ export default class Stardance {
           .trim()
           .toLowerCase();
       
-        if (integrity === "fraud") {
+        if (integrity === "fraud" || integrity === "banned") {
           continue;
         }
       
