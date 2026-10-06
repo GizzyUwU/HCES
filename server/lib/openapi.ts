@@ -27,7 +27,8 @@ export function getPublicOpenApiSpec(
           path.startsWith("/api/v1") &&
           !path.startsWith("/api/v1/web") &&
           !path.startsWith("/api/v1/docs") &&
-          !path.startsWith("/api/v1/ws/docs"),
+          !path.startsWith("/api/v1/ws/docs") &&
+          path !== "/api/v1/stardance/internalGoiQueue",
       ),
     ),
     components: {

@@ -32,15 +32,43 @@ export namespace SDTypes {
   });
   export const ShopItems = t.Array(ShopItem);
 
+  export const GoiQueueEntry = t.Object({
+    reviewId: t.Number({
+      description: "Review ID parsed from the queue table ID column (e.g. #4552 -> 4552)",
+    }),
+    url: t.String({
+      description: "Review page path parsed from the Actions column (e.g. /admin/certification/review/4339)",
+    }),
+    hours: t.Number(),
+    devlogs: t.Number(),
+    type: t.String(),
+  });
+
   export const QueueCategoryStats = t.Object({
     type: t.String(),
     count: t.Number({
       minimum: 0,
     }),
+    countExcludingBroken: t.Number({
+      description: "Count of pending projects in this category excluding broken review links",
+      minimum: 0,
+    }),
+    brokenCount: t.Number({
+      description: "Count of broken review links in this category",
+      minimum: 0,
+    }),
     pendingHours: t.Number({
       minimum: 0,
     }),
+    pendingHoursExcludingBroken: t.Number({
+      description: "Pending hours in this category excluding broken review links",
+      minimum: 0,
+    }),
     pendingDevlogs: t.Number({
+      minimum: 0,
+    }),
+    pendingDevlogsExcludingBroken: t.Number({
+      description: "Pending devlogs in this category excluding broken review links",
       minimum: 0,
     }),
     oldestInQueue: t.String({
@@ -51,15 +79,31 @@ export namespace SDTypes {
   export const GoiStats = t.Object({
     myUsername: t.String(),
     queueCount: t.Number({
-      description: "Count of pending projects in the queue",
+      description: "Count of pending projects in the queue (including broken review links)",
+      minimum: 0,
+    }),
+    queueCountExcludingBroken: t.Number({
+      description: "Count of pending projects excluding broken review links",
+      minimum: 0,
+    }),
+    brokenCount: t.Number({
+      description: "Count of queue entries whose review page returns 404 or 5xx",
       minimum: 0,
     }),
     pendingHours: t.Number({
-      description: "Total pending hours in queue",
+      description: "Total pending hours in queue (including broken review links)",
+      minimum: 0,
+    }),
+    pendingHoursExcludingBroken: t.Number({
+      description: "Total pending hours excluding broken review links",
       minimum: 0,
     }),
     pendingDevlogs: t.Number({
-      description: "Total pending devlogs in queue",
+      description: "Total pending devlogs in queue (including broken review links)",
+      minimum: 0,
+    }),
+    pendingDevlogsExcludingBroken: t.Number({
+      description: "Total pending devlogs excluding broken review links",
       minimum: 0,
     }),
     oldestInQueue: t.String({

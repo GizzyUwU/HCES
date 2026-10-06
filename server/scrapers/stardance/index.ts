@@ -373,7 +373,27 @@ export default class Stardance {
     };
   }
   
-  async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
+  private normalizeReviewPath(href: string): string | null {
+    if (!href) return null;
+    try {
+      const trimmed = href.trim();
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        const u = new URL(trimmed);
+        return u.pathname + u.search;
+      }
+      if (trimmed.startsWith("/")) return trimmed;
+      return `/${trimmed}`;
+    } catch {
+      return null;
+    }
+  }
+
+  async goiStats(): Promise<
+    | (Static<(typeof SDTypes)["GoiStats"]> & {
+        queueEntries: Static<(typeof SDTypes)["GoiQueueEntry"]>[];
+      })
+    | null
+  > {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
   
@@ -448,6 +468,14 @@ export default class Stardance {
       let pendingHours = 0;
       let pendingDevlogs = 0;
       let oldestInQueue = new Date();
+
+      const queueEntries: {
+        reviewId: number;
+        url: string;
+        hours: number;
+        devlogs: number;
+        type: string;
+      }[] = [];
       
       const categoryMap = new Map<
         string,
@@ -489,6 +517,21 @@ export default class Stardance {
         const ageText = row.find('td[data-label="Age"]').text().trim();
         const type =
           row.find('td[data-label="Type"]').text().trim() || "Unknown";
+
+        const idText = row.find('td[data-label="ID"]').text().trim();
+        const idFromCol = Number(idText.replace(/^#/, "").trim());
+        const rawHref =
+          row.find('td[data-label="Actions"] a').attr("href")?.trim() ?? "";
+        const reviewPath = this.normalizeReviewPath(rawHref) ?? "";
+        let reviewId = idFromCol;
+        if (!Number.isFinite(reviewId) || reviewId <= 0) {
+          const hrefMatch = reviewPath.match(/(\d+)(?:\/)?(?:\?.*)?$/);
+          reviewId = hrefMatch ? Number(hrefMatch[1]) : NaN;
+        }
+
+        if (Number.isFinite(reviewId) && reviewId > 0 && reviewPath) {
+          queueEntries.push({ reviewId, url: reviewPath, hours, devlogs, type });
+        }
       
         pendingHours += hours;
         pendingDevlogs += devlogs;
@@ -544,21 +587,30 @@ export default class Stardance {
       const categories = [...categoryMap.entries()].map(([type, cat]) => ({
         type,
         count: cat.count,
+        countExcludingBroken: cat.count,
+        brokenCount: 0,
         pendingHours: cat.pendingHours,
+        pendingHoursExcludingBroken: cat.pendingHours,
         pendingDevlogs: cat.pendingDevlogs,
+        pendingDevlogsExcludingBroken: cat.pendingDevlogs,
         oldestInQueue: cat.oldestInQueue.toISOString().slice(0, 10),
       }));
-  
+
       return {
         myUsername,
         reviewerLb,
         graph,
         personalStats,
         queueCount,
+        queueCountExcludingBroken: queueCount,
+        brokenCount: 0,
         pendingHours,
+        pendingHoursExcludingBroken: pendingHours,
         pendingDevlogs,
+        pendingDevlogsExcludingBroken: pendingDevlogs,
         oldestInQueue: oldestInQueue.toISOString().slice(0, 10),
-        categories
+        categories,
+        queueEntries,
       };
     } catch (err: any) {
       return null;

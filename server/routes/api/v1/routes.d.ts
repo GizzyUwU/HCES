@@ -8,6 +8,7 @@ import type {
 import Route0 from "./(authed)/me.ts";
 import Route1 from "./(authed)/stardance/(cookieProvided).ts";
 import Route2 from "./(authed)/stardance/(cookieProvided)/goiStats.ts";
+import Route3 from "./(authed)/stardance/(cookieProvided)/internalGoiQueue.ts";
 
 export type App = Elysia<
   string,
@@ -18,6 +19,7 @@ export type App = Elysia<
     me: (typeof Route0)["~Routes"];
     stardance: (typeof Route1)["~Routes"] & {
       goiStats: (typeof Route2)["~Routes"];
+      internalGoiQueue: (typeof Route3)["~Routes"];
     } & {};
   }
 >;

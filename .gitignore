@@ -45,3 +45,5 @@ package-lock.json
 tests/logs
 tests/**/logs
 goog.env
+*.sqlite*
+/data/
