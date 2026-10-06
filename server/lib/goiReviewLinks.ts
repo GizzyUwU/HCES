@@ -294,57 +294,37 @@ async function probeAndCache(
         })),
       );
       const at = Date.now();
-      for (const { item, status } of settled) {
-        if (status == null) continue;
-        try {
-          setCachedReviewStatus({
-            reviewId: item.reviewId,
-            url: item.url,
-            status,
-            checkedAt: at,
-          });
-        } catch (err) {
-          logger.warn("Failed caching GOI review link status", {
-            reviewId: item.reviewId,
-            error: err,
-          });
-        }
-        if (status === 404 || status === 410) {
-          const released = await Promise.all(
-            settled.map(async ({ item, status }) => {
-              if (status != null) {
-                try {
-                  setCachedReviewStatus({
-                    reviewId: item.reviewId,
-                    url: item.url,
-                    status,
-                    checkedAt: at,
-                  });
-                } catch (err) {
-                  logger.warn("Failed caching GOI review link status", {
-                    reviewId: item.reviewId,
-                    error: err,
-                  });
-                }
-              }
-              const ok = await releaseReviewClaim(item.reviewId, cookie);
-              if (ok) {
-                logger.info("Released claim for probed GOI review", {
-                  reviewId: item.reviewId,
-                  status,
-                });
-              } else {
-                logger.warn("Failed releasing claim for probed GOI review", {
-                  reviewId: item.reviewId,
-                  status,
-                });
-              }
-              return ok;
-            }),
-          );
-          void released;
-        }
-      }
+      await Promise.all(
+        settled.map(async ({ item, status }) => {
+          if (status != null) {
+            try {
+              setCachedReviewStatus({
+                reviewId: item.reviewId,
+                url: item.url,
+                status,
+                checkedAt: at,
+              });
+            } catch (err) {
+              logger.warn("Failed caching GOI review link status", {
+                reviewId: item.reviewId,
+                error: err,
+              });
+            }
+          }
+          const ok = await releaseReviewClaim(item.reviewId, cookie);
+          if (ok) {
+            logger.info("Released claim for probed GOI review", {
+              reviewId: item.reviewId,
+              status,
+            });
+          } else {
+            logger.warn("Failed releasing claim for probed GOI review", {
+              reviewId: item.reviewId,
+              status,
+            });
+          }
+        }),
+      );
     }
   } catch (err) {
     logger.warn("Background GOI review link refresh failed", { error: err });
