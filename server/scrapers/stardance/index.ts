@@ -214,12 +214,12 @@ export default class Stardance {
     const rawGraph = graph.attr(
       "data-certification--ysws--reviewer-chart-chart-value",
     );
-  
+
     if (!rawGraph) {
       this.logger.warn("GOI reviewer chart data attribute is missing.");
       return { dates: [] };
     }
-  
+
     let parsed: {
       labels: string[];
       series: {
@@ -227,7 +227,7 @@ export default class Stardance {
         data: number[];
       }[];
     };
-  
+
     try {
       parsed = JSON.parse(rawGraph);
     } catch (err) {
@@ -236,10 +236,10 @@ export default class Stardance {
       });
       return { dates: [] };
     }
-  
+
     const labels = parsed.labels ?? [];
     const series = parsed.series ?? [];
-  
+
     const dates = labels.map((date, dateIndex) => ({
       date,
       reviewers: series
@@ -249,18 +249,18 @@ export default class Stardance {
         }))
         .filter((reviewer) => reviewer.reviews > 0),
     }));
-  
+
     return {
       dates,
     };
   }
-  
+
   private async goiPersonalStats(
     $: CheerioAPI,
   ): Promise<Static<(typeof SDTypes)["GoiStats"]>["personalStats"]> {
     const container = $(".ysws-dashboard__progress-stats");
     const stats = container.find(".ysws-dashboard__progress-stat").toArray();
-  
+
     let devlogsPerDayThisWeek = 0;
     let projectsPerDayThisWeek = 0;
     let numberNeededToTodaysGoal: number | null = null;
@@ -268,64 +268,64 @@ export default class Stardance {
     let diffPplProjectsReviewed = 0;
     let projectsToday = 0;
     let shareThisWeek = 0;
-  
+
     let bestDay = {
       devlogCount: 0,
       date: "",
     };
-  
+
     let rankThisWeek = {
       rank: 0,
       totalPpl: 0,
     };
-  
+
     const hero = $(".ysws-dashboard__progress-hero");
     const paceCounts = hero.find(
       ".ysws-dashboard__progress-paces .ysws-dashboard__progress-count",
     );
-  
+
     devlogsPerDayThisWeek = parseNum(paceCounts.eq(0).text());
     projectsPerDayThisWeek = parseNum(paceCounts.eq(1).text());
-  
+
     const goalMatch = hero
       .find(".ysws-dashboard__progress-note")
       .text()
       .trim()
       .match(/\d+/);
-  
+
     numberNeededToTodaysGoal = goalMatch
       ? parseNum(goalMatch[0])
       : null;
-  
+
     for (const bStat of stats) {
       const stat = $(bStat);
       const label = stat.find(".ysws-dashboard__progress-stat-label").text();
       const value = stat.find(".ysws-dashboard__progress-stat-value").text();
       const note = stat.find(".ysws-dashboard__progress-stat-note").text();
-  
+
       switch (label) {
         case "Hours certified":
           certifiedHours = parseNum(value);
           break;
-  
+
         case "People reviewed":
           diffPplProjectsReviewed = parseNum(value);
           break;
-  
+
         case "Projects today":
           projectsToday = parseNum(value);
           break;
-  
+
         case "Best day": {
           bestDay.devlogCount = parseNum(value);
           bestDay.date = String(note.match(/set (\S+)/)?.[1] ?? "");
           break;
         }
-  
+
         case "Share this week":
           shareThisWeek = parseNum(value.replace(/%/g, ""));
           break;
-  
+
         case "Rank this week":
           rankThisWeek.rank =
             value === "—" || value === "-" || value === "–"
@@ -336,27 +336,27 @@ export default class Stardance {
             note.match(/of (\d+) reviewers/)?.[1] ?? "0",
           );
           break;
-  
+
         default:
           break;
       }
     }
-  
+
     const tierNote = $(".ysws-dashboard__progress-tier-note").text();
     const allTimeDevlogs = parseNum(
       $(".ysws-dashboard__progress-tier-note strong").text(),
     );
-  
+
     const devlogsTillMorePayMatch = tierNote.match(/(\d+)\s+mores?/);
     const devlogsTillMorePay = devlogsTillMorePayMatch
       ? parseNum(devlogsTillMorePayMatch[1] ?? "")
       : null;
-  
+
     const currentPayMatch = tierNote.match(/up from ([\d.]+)/);
     const currentPay = currentPayMatch
       ? parseNum(currentPayMatch[1] ?? "")
       : 0;
-  
+
     return {
       devlogsPerDayThisWeek,
       projectsPerDayThisWeek,
@@ -372,31 +372,11 @@ export default class Stardance {
       diffPplProjectsReviewed,
     };
   }
-  
-  private normalizeReviewPath(href: string): string | null {
-    if (!href) return null;
-    try {
-      const trimmed = href.trim();
-      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-        const u = new URL(trimmed);
-        return u.pathname + u.search;
-      }
-      if (trimmed.startsWith("/")) return trimmed;
-      return `/${trimmed}`;
-    } catch {
-      return null;
-    }
-  }
 
-  async goiStats(): Promise<
-    | (Static<(typeof SDTypes)["GoiStats"]> & {
-        queueEntries: Static<(typeof SDTypes)["GoiQueueEntry"]>[];
-      })
-    | null
-  > {
+  async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
-  
+
     try {
       const [res, resMainPage] = await Promise.all([
         this.request("/admin/certification/review/dashboard"),
@@ -404,14 +384,14 @@ export default class Stardance {
           "/admin/certification/review?sort=length&dir=asc&search=&with_integrity=0&project_type=",
         ),
       ]);
-  
+
       const [html, htmlMain] = await Promise.all([
         res.text(),
         resMainPage.text(),
       ]);
-  
+
       this.lastCode = res.status;
-  
+
       if (
         typeof html !== "string" ||
         !(
@@ -429,7 +409,7 @@ export default class Stardance {
         });
         return null;
       }
-  
+
       if (
         typeof htmlMain !== "string" ||
         !(
@@ -447,15 +427,15 @@ export default class Stardance {
         });
         return null;
       }
-  
+
       const $ = load(html);
       const main = load(htmlMain);
-  
+
       const lbRows = $(".ysws-dashboard__table tbody tr").toArray();
       const reviewerLb = await this.goiReviewerLb($, lbRows);
       const graph = await this.goiReviewerGraph($);
       const personalStats = await this.goiPersonalStats($);
-  
+
       const myUsername = $(".sidebar__user-meta-handle")
         .text()
         .replace(/\s+/g, " ")
@@ -463,20 +443,12 @@ export default class Stardance {
         .replace(/^@/, "");
 
       const queueRows = main("table tbody tr").toArray();
-      
+
       let queueCount = 0;
       let pendingHours = 0;
       let pendingDevlogs = 0;
       let oldestInQueue = new Date();
 
-      const queueEntries: {
-        reviewId: number;
-        url: string;
-        hours: number;
-        devlogs: number;
-        type: string;
-      }[] = [];
-      
       const categoryMap = new Map<
         string,
         {
@@ -486,22 +458,22 @@ export default class Stardance {
           oldestInQueue: Date;
         }
       >();
-      
+
       for (const bRow of queueRows) {
         const row = main(bRow);
-      
+
         const integrity = row
           .find('td[data-label="Integrity"]')
           .text()
           .trim()
           .toLowerCase();
-      
+
         if (integrity === "fraud" || integrity === "banned") {
           continue;
         }
-      
+
         queueCount += 1;
-      
+
         const hours = Number(
           row
             .find('td[data-label="Hours"]')
@@ -509,43 +481,28 @@ export default class Stardance {
             .trim()
             .match(/[\d.]+/)?.[0] ?? 0,
         );
-      
+
         const devlogs = Number(
           row.find('td[data-label="pending devlogs"]').text().trim() || 0,
         );
-      
+
         const ageText = row.find('td[data-label="Age"]').text().trim();
         const type =
           row.find('td[data-label="Type"]').text().trim() || "Unknown";
 
-        const idText = row.find('td[data-label="ID"]').text().trim();
-        const idFromCol = Number(idText.replace(/^#/, "").trim());
-        const rawHref =
-          row.find('td[data-label="Actions"] a').attr("href")?.trim() ?? "";
-        const reviewPath = this.normalizeReviewPath(rawHref) ?? "";
-        let reviewId = idFromCol;
-        if (!Number.isFinite(reviewId) || reviewId <= 0) {
-          const hrefMatch = reviewPath.match(/(\d+)(?:\/)?(?:\?.*)?$/);
-          reviewId = hrefMatch ? Number(hrefMatch[1]) : NaN;
-        }
-
-        if (Number.isFinite(reviewId) && reviewId > 0 && reviewPath) {
-          queueEntries.push({ reviewId, url: reviewPath, hours, devlogs, type });
-        }
-      
         pendingHours += hours;
         pendingDevlogs += devlogs;
-      
+
         const ageMatch = ageText.match(
           /(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/i,
         );
-      
+
         let date: Date | null = null;
-      
+
         if (ageMatch) {
           const amount = Number(ageMatch[1]);
           const unit = ageMatch[2]?.toLowerCase();
-      
+
           const ageMs =
             unit === "minute"
               ? amount * 60 * 1000
@@ -558,41 +515,44 @@ export default class Stardance {
                     : unit === "month"
                       ? amount * 30 * 24 * 60 * 60 * 1000
                       : amount * 365 * 24 * 60 * 60 * 1000;
-      
+
           date = new Date(Date.now() - ageMs);
-      
+
           if (date < oldestInQueue) {
             oldestInQueue = date;
           }
         }
-      
+
         const cat = categoryMap.get(type) ?? {
           count: 0,
           pendingHours: 0,
           pendingDevlogs: 0,
           oldestInQueue: new Date(),
         };
-      
+
         cat.count += 1;
         cat.pendingHours += hours;
         cat.pendingDevlogs += devlogs;
-      
+
         if (date && date < cat.oldestInQueue) {
           cat.oldestInQueue = date;
         }
-      
+
         categoryMap.set(type, cat);
       }
 
       const categories = [...categoryMap.entries()].map(([type, cat]) => ({
         type,
         count: cat.count,
-        countExcludingBroken: cat.count,
-        brokenCount: 0,
+        countExcludingBroken: null,
+        brokenCount: null,
+        brokenCheckedCount: 0,
+        brokenTotalCount: cat.count,
+        brokenCheckComplete: false,
         pendingHours: cat.pendingHours,
-        pendingHoursExcludingBroken: cat.pendingHours,
+        pendingHoursExcludingBroken: null,
         pendingDevlogs: cat.pendingDevlogs,
-        pendingDevlogsExcludingBroken: cat.pendingDevlogs,
+        pendingDevlogsExcludingBroken: null,
         oldestInQueue: cat.oldestInQueue.toISOString().slice(0, 10),
       }));
 
@@ -602,15 +562,17 @@ export default class Stardance {
         graph,
         personalStats,
         queueCount,
-        queueCountExcludingBroken: queueCount,
-        brokenCount: 0,
+        queueCountExcludingBroken: null,
+        brokenCount: null,
+        brokenCheckedCount: 0,
+        brokenTotalCount: queueCount,
+        brokenCheckComplete: false,
         pendingHours,
-        pendingHoursExcludingBroken: pendingHours,
+        pendingHoursExcludingBroken: null,
         pendingDevlogs,
-        pendingDevlogsExcludingBroken: pendingDevlogs,
+        pendingDevlogsExcludingBroken: null,
         oldestInQueue: oldestInQueue.toISOString().slice(0, 10),
         categories,
-        queueEntries,
       };
     } catch (err: any) {
       return null;
