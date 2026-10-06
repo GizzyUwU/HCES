@@ -6,6 +6,7 @@ import { SDTypes } from "@server/scrapers/stardance/types";
 import { logger } from "@server/lib/logger";
 
 export const GOI_REVIEW_CHECK_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+export const GOI_REVIEW_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const PROBE_CONCURRENCY = 6;
 const MAX_CHECKS_PER_JOB = 60;
 const STARDANCE_BASE_URL = "https://stardance.hackclub.com";
@@ -181,11 +182,119 @@ export function applyBrokenLinkStats(
 
 const refreshInFlight = new Set<number>();
 
+let lastSeenCookie = "";
+
+function normalizeCookie(cookie: string): string {
+  if (!cookie) return "";
+  return cookie.startsWith("_stardance_session_4=")
+    ? cookie
+    : `_stardance_session_4=${cookie}`;
+}
+
+function resolveJobCookie(override?: string): string {
+  return (
+    normalizeCookie(override ?? "") ||
+    lastSeenCookie ||
+    normalizeCookie(process.env["STARDANCE_AUTH_COOKIE"] ?? "")
+  );
+}
+
+function getStaleReviewLinks(
+  limit = MAX_CHECKS_PER_JOB,
+): { reviewId: number; url: string }[] {
+  try {
+    const rows = getReviewLinkDb()
+      .query<
+        ReviewLinkStatus,
+        [number]
+      >(
+        `SELECT review_id as reviewId, url, status, checked_at as checkedAt
+         FROM review_link_status
+         ORDER BY checked_at ASC
+         LIMIT ?`,
+      )
+      .all(limit);
+    const now = Date.now();
+    const stale = rows.filter(
+      (r) =>
+        Number.isFinite(r.reviewId) &&
+        r.reviewId > 0 &&
+        !!r.url &&
+        !refreshInFlight.has(r.reviewId) &&
+        !isFresh(r.checkedAt, now),
+    );
+    return stale.map((r) => ({ reviewId: r.reviewId, url: r.url }));
+  } catch {
+    return [];
+  }
+}
+
+async function probeAndCache(
+  batch: { reviewId: number; url: string }[],
+  cookie: string,
+): Promise<void> {
+  for (const item of batch) refreshInFlight.add(item.reviewId);
+  try {
+    for (let i = 0; i < batch.length; i += PROBE_CONCURRENCY) {
+      const chunk = batch.slice(i, i + PROBE_CONCURRENCY);
+      const settled = await Promise.all(
+        chunk.map(async (item) => ({
+          item,
+          status: await probeReviewStatus(item.url, cookie),
+        })),
+      );
+      const at = Date.now();
+      for (const { item, status } of settled) {
+        if (status == null) continue;
+        try {
+          setCachedReviewStatus({
+            reviewId: item.reviewId,
+            url: item.url,
+            status,
+            checkedAt: at,
+          });
+        } catch (err) {
+          logger.warn("Failed caching GOI review link status", {
+            reviewId: item.reviewId,
+            error: err,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn("Background GOI review link refresh failed", {
+      error: err,
+    });
+  } finally {
+    for (const item of batch) refreshInFlight.delete(item.reviewId);
+  }
+}
+
+let jobRunning = false;
+
+export async function runGoiReviewCheckJob(
+  overrideCookie?: string,
+): Promise<number> {
+  if (jobRunning) return 0;
+  const cookie = resolveJobCookie(overrideCookie);
+  if (!cookie) return 0;
+  const batch = getStaleReviewLinks(MAX_CHECKS_PER_JOB);
+  if (batch.length === 0) return 0;
+  jobRunning = true;
+  try {
+    await probeAndCache(batch, cookie);
+    return batch.length;
+  } finally {
+    jobRunning = false;
+  }
+}
+
 export function refreshReviewLinksInBackground(
   entries: { reviewId: number; url: string }[],
   cookie: string,
 ): void {
   if (!cookie) return;
+  lastSeenCookie = normalizeCookie(cookie);
   const toCheck: { reviewId: number; url: string }[] = [];
   const seen = new Set<number>();
   for (const e of entries) {
@@ -197,42 +306,6 @@ export function refreshReviewLinksInBackground(
   }
   const batch = toCheck.slice(0, MAX_CHECKS_PER_JOB);
   if (batch.length === 0) return;
-  for (const item of batch) refreshInFlight.add(item.reviewId);
 
-  void (async () => {
-    try {
-      for (let i = 0; i < batch.length; i += PROBE_CONCURRENCY) {
-        const chunk = batch.slice(i, i + PROBE_CONCURRENCY);
-        const settled = await Promise.all(
-          chunk.map(async (item) => ({
-            item,
-            status: await probeReviewStatus(item.url, cookie),
-          })),
-        );
-        const at = Date.now();
-        for (const { item, status } of settled) {
-          if (status == null) continue;
-          try {
-            setCachedReviewStatus({
-              reviewId: item.reviewId,
-              url: item.url,
-              status,
-              checkedAt: at,
-            });
-          } catch (err) {
-            logger.warn("Failed caching GOI review link status", {
-              reviewId: item.reviewId,
-              error: err,
-            });
-          }
-        }
-      }
-    } catch (err) {
-      logger.warn("Background GOI review link refresh failed", {
-        error: err,
-      });
-    } finally {
-      for (const item of batch) refreshInFlight.delete(item.reviewId);
-    }
-  })();
+  void probeAndCache(batch, lastSeenCookie);
 }

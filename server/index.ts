@@ -21,6 +21,7 @@ import {
 import { workerChannel } from "@server/lib/worker/workerChannel";
 import { OpenPanel } from "@openpanel/sdk";
 import { preconnectScrapers } from "@server/scrapers/preconnect";
+import { runGoiReviewCheckJob } from "@server/lib/goiReviewLinks";
 import { join } from "node:path";
 import { Counter, Histogram } from "prom-client";
 import { logger } from "@server/lib/logger";
@@ -273,6 +274,24 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
             .returning({ id: session.id });
           if (res.length > 0) {
             logger.info("Go away stinky stale sessions", { count: res.length });
+          }
+        },
+      }),
+    )
+    .use(
+      cron({
+        name: "goiReviewCheck",
+        pattern: Patterns.EVERY_5_MINUTES,
+        run: async () => {
+          try {
+            const checked = await runGoiReviewCheckJob();
+            if (checked > 0) {
+              logger.info("GOI review link check job ran", {
+                count: checked,
+              });
+            }
+          } catch (err) {
+            logger.warn("GOI review link check job failed", { error: err });
           }
         },
       }),
