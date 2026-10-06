@@ -278,24 +278,24 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         },
       }),
     )
-    .use(
-      cron({
-        name: "goiReviewCheck",
-        pattern: Patterns.EVERY_5_MINUTES,
-        run: async () => {
-          try {
-            const checked = await runGoiReviewCheckJob();
-            if (checked > 0) {
-              logger.info("GOI review link check job ran", {
-                count: checked,
-              });
-            }
-          } catch (err) {
-            logger.warn("GOI review link check job failed", { error: err });
-          }
-        },
-      }),
-    );
+    // .use(
+    //   cron({
+    //     name: "goiReviewCheck",
+    //     pattern: Patterns.EVERY_5_MINUTES,
+    //     run: async () => {
+    //       try {
+    //         const checked = await runGoiReviewCheckJob();
+    //         if (checked > 0) {
+    //           logger.info("GOI review link check job ran", {
+    //             count: checked,
+    //           });
+    //         }
+    //       } catch (err) {
+    //         logger.warn("GOI review link check job failed", { error: err });
+    //       }
+    //     },
+    //   }),
+    // );
 
   const routedApp = new Elysia().use(routes);
   const socket = websocketHandler(routedApp);
