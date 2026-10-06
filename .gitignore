@@ -43,4 +43,5 @@ package-lock.json
 **/*.bun
 
 tests/logs
+tests/**/logs
 goog.env

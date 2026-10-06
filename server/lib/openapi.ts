@@ -47,6 +47,16 @@ export function getPublicOpenApiSpec(
           in: "header",
           name: "X-Flavortown-Key",
         },
+        MacondoKey: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Macondo-Key",
+        },
+        MacondoCookie: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Macondo-Cookie",
+        },
       },
     },
     tags: [
@@ -100,6 +110,18 @@ export function getPublicOpenApiSpec(
         name: "Flavortown / Users",
         description: "Flavortown users endpoints",
       },
+      {
+        name: "Macondo",
+        description: "All endpoints that are for Macondo",
+      },
+      {
+        name: "Macondo / Projects",
+        description: "Macondo projects endpoints",
+      },
+      {
+        name: "Macondo / Shop",
+        description: "Macondo shop endpoints",
+      },
     ],
     "x-tagGroups": [
       {
@@ -115,6 +137,8 @@ export function getPublicOpenApiSpec(
           "Stardance Compat / Shop",
           "Flavortown Compat / Projects",
           "Flavortown Compat / Shop",
+          "Macondo Compat / Projects",
+          "Macondo Compat / Shop",
         ],
       },
       {
@@ -132,6 +156,13 @@ export function getPublicOpenApiSpec(
           "Flavortown / Devlogs",
           "Flavortown / Shop",
           "Flavortown / Users",
+        ],
+      },
+      {
+        name: "Macondo",
+        tags: [
+          "Macondo / Projects",
+          "Macondo / Shop",
         ],
       },
     ],

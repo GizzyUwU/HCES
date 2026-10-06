@@ -241,10 +241,7 @@ function Dashboard() {
         </div>
         <button
           class="button hc-btn-primary ml-auto mt-2 min-w-full"
-          // disabled={
-          //   createKey.isPending ||
-          //   (queryKeys.data && queryKeys.data.length >= 5)
-          // }
+
           onClick={() => setDelModel(true)}
         >
           Delete Account?

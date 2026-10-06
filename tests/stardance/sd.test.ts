@@ -47,7 +47,7 @@ if (process.env["STARDANCE_AUTH_COOKIE"]) {
   test("GOI Stats API returns normal data", async () => {
     const res = await authedClient.goiStats();
     await storeResponse("goiStats", res);
-    // expect(true).toBe(true)
+
     const errors = [...Value.Errors(SDTypes["GoiStats"], res)];
     if (errors.length > 0) console.error(errors);
     expect(errors).toHaveLength(0);

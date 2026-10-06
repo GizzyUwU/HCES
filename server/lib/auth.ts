@@ -1,4 +1,3 @@
-// lib/auth.ts
 import oauth2 from "@bogeychan/elysia-oauth2";
 import type {
   TOAuth2Provider,

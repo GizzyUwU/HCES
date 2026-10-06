@@ -13,13 +13,6 @@ async function storeResponse(testName: string, res: unknown) {
   await Bun.write(file, JSON.stringify(res, null, 2))
 }
 
-// test("Shop API returns normal data", async () => {
-//   const res = await client.shop()
-//   const errors = [...Value.Errors(SDTypes.shopItems, res)];
-//   if (errors.length > 0) console.error(errors)
-//   expect(errors).toHaveLength(0);
-// });
-
 if (process.env["TEST_API_KEY"] && process.env["STARDANCE_AUTH_COOKIE"]) {
   test("GOI Stats API returns normal data", async () => {
     const res = await fetch("http://localhost:8000/api/v1/stardance/goiStats", {

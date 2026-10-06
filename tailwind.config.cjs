@@ -1,8 +1,7 @@
 const plugin = require('tailwindcss/plugin')
 
-/** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'media', // config.useColorSchemeMediaQuery: true
+  darkMode: 'media',
   content: ['./src/**/*.{html,js,jsx,ts,tsx}'],
   theme: {
     screens: {

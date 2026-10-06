@@ -1,4 +1,3 @@
-// lib/session.ts
 import { db } from "@server/lib/db";
 import tables from '@server/schema/index'
 import { eq } from "drizzle-orm";

@@ -162,18 +162,47 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
       const url = new URL(request.url);
 
       if (code === "VALIDATION") {
-        const validation = error.all?.[0] ?? error;
-    
-        const details = {
-          path: "path" in validation ? validation.path : undefined,
-          message: "message" in validation ? validation.message : error.message,
-          value: "value" in validation ? validation.value : undefined,
-        };
-      
-        logger.error(
-          `[VALIDATION] ${request.method} ${url.pathname} ${set.status}`, {
-            details
+        const allErrors = (Array.isArray((error as any).all) ? (error as any).all : []) as Array<Record<string, any>>;
+        const first = allErrors[0] ?? {};
+        const found = first.value ?? (error as any).value;
+        const foundType = Array.isArray(found) ? "array" : found === null ? "null" : typeof found;
+
+        const on = (error as any).type ?? "unknown";
+        const firstPath = typeof first.path === "string" ? first.path : "/";
+        const firstMessage = first.summary ?? first.message ?? error.message;
+        const safeStringify = (v: unknown, len: number) => {
+          try {
+            return (JSON.stringify(v) ?? String(v)).slice(0, len);
+          } catch {
+            return String(v).slice(0, len);
           }
+        };
+
+        const isDev = Boolean(process.env["PRODUCTION"]) !== true;
+        const fullValue = (error as any).value;
+
+        logger.error(
+          `[VALIDATION] ${request.method} ${url.pathname} (on ${on}) -> 500: ${firstPath} ${firstMessage} (found ${foundType}: ${safeStringify(found, 200)})`,
+          {
+            on,
+            method: request.method,
+            path: url.pathname,
+            query: url.search || undefined,
+            status: 500,
+            errorCount: allErrors.length,
+            firstError: {
+              path: firstPath,
+              message: firstMessage,
+              found,
+              foundType,
+            },
+            errors: allErrors.slice(0, 5).map((e) => ({
+              path: e.path,
+              message: e.summary ?? e.message,
+              value: e.value,
+            })),
+            ...(isDev ? { body: safeStringify(fullValue, 4000) } : {}),
+          },
         );
 
         set.status = 500;
@@ -259,7 +288,7 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     },
     servers: {
       hces: {
-        host: "hces.gizzy.gay", // AsyncAPI url is host[:port][/path], no protocol prefix
+        host: "hces.gizzy.gay",
         protocol: "wss",
         security: [{ $ref: "#/components/securitySchemes/Header" }],
       },
