@@ -12,6 +12,10 @@ const turndown = new TurndownService({
   codeBlockStyle: "fenced",
 });
 
+export type GoiStatsWithEntries = Static<(typeof SDTypes)["GoiStats"]> & {
+  queueEntries?: Static<(typeof SDTypes)["GoiQueueEntry"]>[];
+};
+
 turndown.addRule("stripAnchors", {
   filter: (node) => node.nodeName === "A" && node.classList.contains("anchor"),
   replacement: () => "",
@@ -373,7 +377,7 @@ export default class Stardance {
     };
   }
 
-  async goiStats(): Promise<Static<(typeof SDTypes)["GoiStats"]> | null> {
+  async goiStats(): Promise<GoiStatsWithEntries | null> {
     await this.ready;
     if (!this.keySet) throw new Error("This requires a cookie to be provided");
 
@@ -449,6 +453,8 @@ export default class Stardance {
       let pendingDevlogs = 0;
       let oldestInQueue = new Date();
 
+      const queueEntries: Static<(typeof SDTypes)["GoiQueueEntry"]>[] = [];
+
       const categoryMap = new Map<
         string,
         {
@@ -489,6 +495,30 @@ export default class Stardance {
         const ageText = row.find('td[data-label="Age"]').text().trim();
         const type =
           row.find('td[data-label="Type"]').text().trim() || "Unknown";
+
+        // Review ID + path come from the row's review link, so this doesn't
+        // depend on the ID/Actions column labels.
+        const reviewPath =
+          row
+            .find('a[href*="/admin/certification/review/"]')
+            .toArray()
+            .map((a) => {
+              try {
+                return new URL(
+                  main(a).attr("href") ?? "",
+                  Stardance.config.baseUrl,
+                ).pathname;
+              } catch {
+                return "";
+              }
+            })
+            .find((p) => /^\/admin\/certification\/review\/\d+\/?$/.test(p)) ??
+          "";
+        const reviewId = Number(reviewPath.match(/\/review\/(\d+)/)?.[1] ?? 0);
+
+        if (reviewId > 0 && reviewPath) {
+          queueEntries.push({ reviewId, url: reviewPath, hours, devlogs, type });
+        }
 
         pendingHours += hours;
         pendingDevlogs += devlogs;
@@ -573,8 +603,10 @@ export default class Stardance {
         pendingDevlogsExcludingBroken: null,
         oldestInQueue: oldestInQueue.toISOString().slice(0, 10),
         categories,
+        queueEntries,
       };
     } catch (err: any) {
+      this.logger.warn("GOI stats scrape failed", { error: err });
       return null;
     }
   }

@@ -130,6 +130,12 @@ export function applyBrokenLinkStats(
   const entries = (body.queueEntries ?? []).filter(
     (e) => Number.isFinite(e.reviewId) && e.reviewId > 0 && !!e.url,
   );
+  if (entries.length === 0 && body.queueCount > 0) {
+    logger.warn(
+      "GOI queue has rows but no queueEntries were scraped; check ID/link selectors",
+      { queueCount: body.queueCount },
+    );
+  }
   const statuses = new Map<number, number>();
   for (const e of entries) {
     if (statuses.has(e.reviewId)) continue;
