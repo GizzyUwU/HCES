@@ -87,7 +87,7 @@ export function getPublicOpenApiSpec(
         description: "Stardance projects endpoints",
       },
       {
-        name: "Stardance / Sho",
+        name: "Stardance / Shop",
         description: "Stardance shop endpoints",
       },
       {
@@ -119,8 +119,40 @@ export function getPublicOpenApiSpec(
         description: "Macondo projects endpoints",
       },
       {
+        name: "Macondo / Profile",
+        description: "Macondo profile endpoints",
+      },
+      {
+        name: "Macondo / Orders",
+        description: "Macondo orders endpoints",
+      },
+      {
         name: "Macondo / Shop",
         description: "Macondo shop endpoints",
+      },
+      {
+        name: "Macondo Compat / Projects",
+        description: "Macondo compat projects endpoints",
+      },
+      {
+        name: "Macondo Compat / Shop",
+        description: "Macondo compat shop endpoints",
+      },
+      {
+        name: "Flavortown Compat / Projects",
+        description: "Flavortown compat projects endpoints",
+      },
+      {
+        name: "Flavortown Compat / Shop",
+        description: "Flavortown compat shop endpoints",
+      },
+      {
+        name: "StardanceCompat / Projects",
+        description: "Stardance compat projects endpoints",
+      },
+      {
+        name: "StardanceCompat / Shop",
+        description: "Stardance compat shop endpoints",
       },
     ],
     "x-tagGroups": [
@@ -133,8 +165,8 @@ export function getPublicOpenApiSpec(
       {
         name: "Compatability",
         tags: [
-          "Stardance Compat / Projects",
-          "Stardance Compat / Shop",
+          "StardanceCompat / Projects",
+          "StardanceCompat / Shop",
           "Flavortown Compat / Projects",
           "Flavortown Compat / Shop",
           "Macondo Compat / Projects",
@@ -162,6 +194,8 @@ export function getPublicOpenApiSpec(
         name: "Macondo",
         tags: [
           "Macondo / Projects",
+          "Macondo / Profile",
+          "Macondo / Orders",
           "Macondo / Shop",
         ],
       },
