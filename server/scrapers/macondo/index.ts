@@ -274,6 +274,18 @@ export default class Macondo {  lastCode: number | null = null;
       const data = await res.json();
       this.lastCode = res.status;
       if (!res.ok) return null;
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const coerced = coerceToSchema(data as Record<string, unknown>, MCTypes["StreaksResponse"]);
+        const projects = (coerced as any).projects;
+        if (Array.isArray(projects)) {
+          (coerced as any).projects = projects.map((p: unknown) =>
+            p && typeof p === "object" && !Array.isArray(p)
+              ? coerceToSchema(p as Record<string, unknown>, MCTypes["StreaksProject"])
+              : p,
+          );
+        }
+        return coerced as Static<typeof MCTypes["StreaksResponse"]>;
+      }
       return data;
     } catch {
       return null;

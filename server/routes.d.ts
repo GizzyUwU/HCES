@@ -45,14 +45,13 @@ import Route36 from "./routes/api/v1/(authed)/stardance/compat/projects/[id]/ind
 import Route37 from "./routes/api/v1/(authed)/stardance/compat/projects/[id]/devlogs/[devlogId].ts";
 import Route38 from "./routes/api/v1/(authed)/stardance/compat/projects/[id]/devlogs/index.ts";
 import Route39 from "./routes/api/v1/(authed)/stardance/(cookieProvided)/goiStats.ts";
-import Route40 from "./routes/api/v1/(authed)/stardance/(cookieProvided)/internalGoiQueue.ts";
-import Route41 from "./routes/api/v1/web/(hcaAuthed).ts";
-import Route42 from "./routes/api/v1/web/login/getRedirectUrl.ts";
-import Route43 from "./routes/api/v1/web/login/getOUT.ts";
-import Route44 from "./routes/api/v1/web/login/sessionCheck.ts";
-import Route45 from "./routes/api/v1/web/(hcaAuthed)/account.ts";
-import Route46 from "./routes/api/v1/web/(hcaAuthed)/apiKeys.ts";
-import Route47 from "./routes/api/v1/web/(hcaAuthed)/workers.ts";
+import Route40 from "./routes/api/v1/web/(hcaAuthed).ts";
+import Route41 from "./routes/api/v1/web/login/getRedirectUrl.ts";
+import Route42 from "./routes/api/v1/web/login/getOUT.ts";
+import Route43 from "./routes/api/v1/web/login/sessionCheck.ts";
+import Route44 from "./routes/api/v1/web/(hcaAuthed)/account.ts";
+import Route45 from "./routes/api/v1/web/(hcaAuthed)/apiKeys.ts";
+import Route46 from "./routes/api/v1/web/(hcaAuthed)/workers.ts";
 
 export type App = Elysia<
   string,
@@ -116,7 +115,6 @@ export type App = Elysia<
         } & {};
         stardance: (typeof Route28)["~Routes"] & {
           goiStats: (typeof Route39)["~Routes"];
-          internalGoiQueue: (typeof Route40)["~Routes"];
         } & {
           shop: (typeof Route30)["~Routes"] & {
             ":id": (typeof Route29)["~Routes"];
@@ -142,15 +140,15 @@ export type App = Elysia<
           };
         };
       } & {
-        web: (typeof Route41)["~Routes"] & {
-          account: (typeof Route45)["~Routes"];
-          apiKeys: (typeof Route46)["~Routes"];
-          workers: (typeof Route47)["~Routes"];
+        web: (typeof Route40)["~Routes"] & {
+          account: (typeof Route44)["~Routes"];
+          apiKeys: (typeof Route45)["~Routes"];
+          workers: (typeof Route46)["~Routes"];
         } & {
           login: {
-            getRedirectUrl: (typeof Route42)["~Routes"];
-            getOUT: (typeof Route43)["~Routes"];
-            sessionCheck: (typeof Route44)["~Routes"];
+            getRedirectUrl: (typeof Route41)["~Routes"];
+            getOUT: (typeof Route42)["~Routes"];
+            sessionCheck: (typeof Route43)["~Routes"];
           };
         };
       };

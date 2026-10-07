@@ -254,7 +254,23 @@ export namespace MCTypes {
     thumbnailUrl: Nullish(t.String()),
   });
 
-  export const StreaksResponse = t.Unknown();
+  export const StreaksProject = t.Object({
+    id: Nullish(t.Number()),
+    name: Nullish(t.String()),
+    project_streak_days: Nullish(t.Number()),
+    last_worked_date: Nullish(t.String()),
+    worked_today: Nullish(t.Boolean()),
+    auto_use_streak_freezes: Nullish(t.Boolean()),
+  });
+
+  export const StreaksResponse = t.Object({
+    current_streak: Nullish(t.Number()),
+    streak_freezes_remaining: Nullish(t.Number()),
+    worked_today: Nullish(t.Boolean()),
+    today_seconds_logged: Nullish(t.Number()),
+    daily_goal_seconds: Nullish(t.Number()),
+    projects: Nullish(t.Array(StreaksProject)),
+  });
   export const BalanceResponse = t.Unknown();
   export const StarfruitResponse = t.Unknown();
   export const EarningRateResponse = t.Unknown();
