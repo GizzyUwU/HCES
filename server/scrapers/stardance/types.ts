@@ -38,6 +38,27 @@ export namespace SDTypes {
     count: t.Number({
       minimum: 0,
     }),
+    brokenLinks: Nullable(
+      t.Number({
+        description:
+          "Count of projects in this category whose project page returns 404. Based on cached background checks (2 day TTL). Null when no links in this category have been checked yet.",
+        minimum: 0,
+      }),
+    ),
+    brokenHours: Nullable(
+      t.Number({
+        description:
+          "Pending hours tied to broken project links in this category. Null when no links in this category have been checked yet.",
+        minimum: 0,
+      }),
+    ),
+    brokenDevlogs: Nullable(
+      t.Number({
+        description:
+          "Pending devlogs tied to broken project links in this category. Null when no links in this category have been checked yet.",
+        minimum: 0,
+      }),
+    ),
     pendingHours: t.Number({
       minimum: 0,
     }),
@@ -47,6 +68,13 @@ export namespace SDTypes {
     oldestInQueue: t.String({
       format: "date",
     }),
+    oldestUnbrokenInQueue: Nullable(
+      t.String({
+        description:
+          "Oldest queue date in this category excluding projects whose page returns 404. Null when every project in this category is broken or the queue is empty.",
+        format: "date",
+      }),
+    ),
   });
 
   export const GoiStats = t.Object({
@@ -56,6 +84,27 @@ export namespace SDTypes {
         "Count of pending projects in the queue",
       minimum: 0,
     }),
+    brokenLinks: Nullable(
+      t.Number({
+        description:
+          "Total count of queue projects whose project page returns 404. Based on cached background checks (2 day TTL). Null when no links have been checked yet.",
+        minimum: 0,
+      }),
+    ),
+    brokenHours: Nullable(
+      t.Number({
+        description:
+          "Total pending hours tied to broken project links. Null when no links have been checked yet.",
+        minimum: 0,
+      }),
+    ),
+    brokenDevlogs: Nullable(
+      t.Number({
+        description:
+          "Total pending devlogs tied to broken project links. Null when no links have been checked yet.",
+        minimum: 0,
+      }),
+    ),
     pendingHours: t.Number({
       description:
         "Total pending hours in queue",
@@ -69,6 +118,13 @@ export namespace SDTypes {
     oldestInQueue: t.String({
       format: "date",
     }),
+    oldestUnbrokenInQueue: Nullable(
+      t.String({
+        description:
+          "Oldest queue date excluding projects whose page returns 404. Null when every queued project is broken or the queue is empty.",
+        format: "date",
+      }),
+    ),
     categories: t.Array(QueueCategoryStats),
     reviewerLb: t.Array(
       t.Object({

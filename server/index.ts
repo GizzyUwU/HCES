@@ -21,6 +21,8 @@ import {
 import { workerChannel } from "@server/lib/worker/workerChannel";
 import { OpenPanel } from "@openpanel/sdk";
 import { preconnectScrapers } from "@server/scrapers/preconnect";
+import Stardance from "@server/scrapers/stardance";
+import { runBrokenLinkCheckJob } from "@server/lib/brokenLinks";
 import { join } from "node:path";
 import { Counter, Histogram } from "prom-client";
 import { logger } from "@server/lib/logger";
@@ -277,10 +279,22 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
         },
       }),
     )
+    .use(
+      cron({
+        name: "brokenLinkCheck",
+        pattern: Patterns.EVERY_5_MINUTES,
+        run: async () => {
+          try {
+            await runBrokenLinkCheckJob();
+          } catch (err) {
+            logger.warn("GOI broken link check job failed", { error: err });
+          }
+        },
+      }),
+    )
 
   const routedApp = new Elysia().use(routes);
-  const socket = websocketHandler(routedApp);
-  const channels = [socket];
+  const socket = websocketHandler(routedApp);  const channels = [socket];
   const document = getAsyncApiDocument(channels, {
     info: {
       title: "HCES WS",
@@ -344,6 +358,36 @@ if (process.env["WORKER"] && process.env["ORCHESTRATOR_URL"]) {
     enableLocalWorker(
       process.env["WORKER_KEY"]!,
       process.env["GIT_COMMIT_SHA"] || "1"!,
+    );
+  }
+
+  void runBrokenLinkCheckJob().catch((err) => {
+    logger.warn("GOI broken link check on startup failed", { error: err });
+  });
+
+  const startupCookie = process.env["STARDANCE_AUTH_COOKIE"];
+  if (startupCookie) {
+    const cookie = startupCookie.startsWith("_stardance_session_4=")
+      ? startupCookie
+      : `_stardance_session_4=${startupCookie}`;
+    const startupClient = new Stardance({ logger, cookie });
+    void startupClient
+      .goiStats()
+      .then((stats) => {
+        if (!stats) {
+          logger.warn("GOI stats scrape on startup returned nothing");
+          return;
+        }
+        logger.info(
+          `GOI stats scrape on startup finished, queue ${stats.queueCount}, broken ${stats.brokenLinks ?? "unknown"}`,
+        );
+      })
+      .catch((err) => {
+        logger.warn(`GOI stats scrape on startup failed: ${String(err)}`);
+      });
+  } else {
+    logger.info(
+      "GOI stats scrape on startup skipped, no STARDANCE_AUTH_COOKIE set",
     );
   }
 }

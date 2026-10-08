@@ -4,6 +4,15 @@ import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import { SDTypes } from "./types";
 import { type Static } from "elysia";
+import {
+  brokenCountOrNull,
+  countBrokenLinks,
+  normalizeProjectLink,
+  refreshBrokenLinksInBackground,
+  selectOldestUnbroken,
+  type DatedProjectLink,
+  type ProjectLinkEntry,
+} from "@server/lib/brokenLinks";
 import TurndownService from "turndown";
 import { Histogram } from "prom-client";
 const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
@@ -449,15 +458,17 @@ export default class Stardance {
       let pendingDevlogs = 0;
       let oldestInQueue = new Date();
 
-      const categoryMap = new Map<
-        string,
-        {
-          count: number;
-          pendingHours: number;
-          pendingDevlogs: number;
-          oldestInQueue: Date;
-        }
-      >();
+      type QueueCategoryAcc = {
+        count: number;
+        pendingHours: number;
+        pendingDevlogs: number;
+        oldestInQueue: Date;
+      };
+
+      const categoryMap = new Map<string, QueueCategoryAcc>();
+
+      const projectEntries: ProjectLinkEntry[] = [];
+      const datedEntries: DatedProjectLink[] = [];
 
       for (const bRow of queueRows) {
         const row = main(bRow);
@@ -489,6 +500,14 @@ export default class Stardance {
         const ageText = row.find('td[data-label="Age"]').text().trim();
         const type =
           row.find('td[data-label="Type"]').text().trim() || "Unknown";
+
+        const projectHref = row
+          .find('td[data-label="Project"] a')
+          .attr("href");
+        const projectLink = normalizeProjectLink(projectHref);
+        if (projectLink) {
+          projectEntries.push({ ...projectLink, type, hours, devlogs });
+        }
 
         pendingHours += hours;
         pendingDevlogs += devlogs;
@@ -539,15 +558,60 @@ export default class Stardance {
         }
 
         categoryMap.set(type, cat);
+
+        if (projectLink && date) {
+          datedEntries.push({ url: projectLink.url, type, date });
+        }
       }
 
-      const categories = [...categoryMap.entries()].map(([type, cat]) => ({
-        type,
-        count: cat.count,
-        pendingHours: cat.pendingHours,
-        pendingDevlogs: cat.pendingDevlogs,
-        oldestInQueue: cat.oldestInQueue.toISOString().slice(0, 10),
-      }));
+      const {
+        total: brokenTotal,
+        checked: brokenChecked,
+        brokenHours: brokenHoursTotal,
+        brokenDevlogs: brokenDevlogsTotal,
+        brokenUrls,
+        byCategory: brokenByCategory,
+      } = countBrokenLinks(projectEntries);
+      refreshBrokenLinksInBackground(projectEntries, this.cookie);
+      const { oldest: oldestUnbroken, byCategory: oldestUnbrokenByCat } =
+        selectOldestUnbroken(datedEntries, brokenUrls);
+      const toDateString = (d: Date | null | undefined): string | null =>
+        d ? d.toISOString().slice(0, 10) : null;
+      this.logger.info(
+        `GOI broken link stats applied, queue ${queueCount}, links ${projectEntries.length}, checked ${brokenChecked}, broken ${brokenTotal}`,
+      );
+
+      const categories = [...categoryMap.entries()].map(
+        ([type, cat]: [string, QueueCategoryAcc]) => {
+          const stats = brokenByCategory.get(type);
+          const statsChecked = stats?.checked ?? 0;
+          return {
+            type,
+            count: cat.count,
+            brokenLinks: brokenCountOrNull(
+              cat.count,
+              stats?.broken ?? 0,
+              statsChecked,
+            ),
+            brokenHours: brokenCountOrNull(
+              cat.count,
+              stats?.brokenHours ?? 0,
+              statsChecked,
+            ),
+            brokenDevlogs: brokenCountOrNull(
+              cat.count,
+              stats?.brokenDevlogs ?? 0,
+              statsChecked,
+            ),
+            pendingHours: cat.pendingHours,
+            pendingDevlogs: cat.pendingDevlogs,
+            oldestInQueue: cat.oldestInQueue.toISOString().slice(0, 10),
+            oldestUnbrokenInQueue: toDateString(
+              oldestUnbrokenByCat.get(type),
+            ),
+          };
+        },
+      );
 
       return {
         myUsername,
@@ -555,9 +619,25 @@ export default class Stardance {
         graph,
         personalStats,
         queueCount,
+        brokenLinks: brokenCountOrNull(
+          queueCount,
+          brokenTotal,
+          brokenChecked,
+        ),
+        brokenHours: brokenCountOrNull(
+          queueCount,
+          brokenHoursTotal,
+          brokenChecked,
+        ),
+        brokenDevlogs: brokenCountOrNull(
+          queueCount,
+          brokenDevlogsTotal,
+          brokenChecked,
+        ),
         pendingHours,
         pendingDevlogs,
         oldestInQueue: oldestInQueue.toISOString().slice(0, 10),
+        oldestUnbrokenInQueue: toDateString(oldestUnbroken),
         categories,
       };
     } catch (err: any) {
