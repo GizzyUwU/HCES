@@ -8,6 +8,7 @@ import {
   brokenCountOrNull,
   countBrokenLinks,
   normalizeProjectLink,
+  parseQueueAge,
   refreshBrokenLinksInBackground,
   selectOldestUnbroken,
   type DatedProjectLink,
@@ -512,34 +513,10 @@ export default class Stardance {
         pendingHours += hours;
         pendingDevlogs += devlogs;
 
-        const ageMatch = ageText.match(
-          /(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/i,
-        );
+        const date = parseQueueAge(ageText);
 
-        let date: Date | null = null;
-
-        if (ageMatch) {
-          const amount = Number(ageMatch[1]);
-          const unit = ageMatch[2]?.toLowerCase();
-
-          const ageMs =
-            unit === "minute"
-              ? amount * 60 * 1000
-              : unit === "hour"
-                ? amount * 60 * 60 * 1000
-                : unit === "day"
-                  ? amount * 24 * 60 * 60 * 1000
-                  : unit === "week"
-                    ? amount * 7 * 24 * 60 * 60 * 1000
-                    : unit === "month"
-                      ? amount * 30 * 24 * 60 * 60 * 1000
-                      : amount * 365 * 24 * 60 * 60 * 1000;
-
-          date = new Date(Date.now() - ageMs);
-
-          if (date < oldestInQueue) {
-            oldestInQueue = date;
-          }
+        if (date && date < oldestInQueue) {
+          oldestInQueue = date;
         }
 
         const cat = categoryMap.get(type) ?? {

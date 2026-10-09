@@ -21,6 +21,7 @@ const {
   isBrokenStatus,
   isFresh,
   normalizeProjectLink,
+  parseQueueAge,
   rememberProjectLinks,
   selectOldestUnbroken,
 } = await import("@server/lib/brokenLinks");
@@ -202,6 +203,37 @@ test("oldest unbroken is null when everything is broken", () => {
   const empty = selectOldestUnbroken([], new Set(["/projects/1"]));
   expect(empty.oldest).toBeNull();
   expect(empty.byCategory.size).toBe(0);
+});
+
+test("parseQueueAge handles Today, Yesterday and relative ages", () => {
+  const now = new Date("2026-10-09T12:00:00.000Z").getTime();
+  expect(parseQueueAge("Today", now)).toEqual(new Date(now));
+  expect(parseQueueAge("today", now)).toEqual(new Date(now));
+  expect(parseQueueAge("Yesterday", now)).toEqual(
+    new Date(now - 24 * 60 * 60 * 1000),
+  );
+  expect(parseQueueAge("45 days ago", now)).toEqual(
+    new Date(now - 45 * 24 * 60 * 60 * 1000),
+  );
+  expect(parseQueueAge("3 hours ago", now)).toEqual(
+    new Date(now - 3 * 60 * 60 * 1000),
+  );
+  expect(parseQueueAge("", now)).toBeNull();
+  expect(parseQueueAge("sometime", now)).toBeNull();
+});
+
+test("oldest unbroken includes Today-aged rows that are not broken", () => {
+  const now = new Date("2026-10-09T12:00:00.000Z").getTime();
+  const rows = [
+    {
+      url: "/projects/1",
+      type: "Web App",
+      date: parseQueueAge("45 days ago", now)!,
+    },
+    { url: "/projects/2", type: "Web App", date: parseQueueAge("Today", now)! },
+  ];
+  const { byCategory } = selectOldestUnbroken(rows, new Set(["/projects/1"]));
+  expect(byCategory.get("Web App")).toEqual(new Date(now));
 });
 
 test("debug state reflects the sqlite cache", () => {

@@ -170,6 +170,36 @@ export type DatedProjectLink = {
   date: Date;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function parseQueueAge(
+  ageText: string,
+  now = Date.now(),
+): Date | null {
+  const normalized = ageText.trim().toLowerCase();
+  if (normalized === "today") return new Date(now);
+  if (normalized === "yesterday") return new Date(now - DAY_MS);
+  const ageMatch = ageText.match(
+    /(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/i,
+  );
+  if (!ageMatch) return null;
+  const amount = Number(ageMatch[1]);
+  const unit = ageMatch[2]?.toLowerCase();
+  const ageMs =
+    unit === "minute"
+      ? amount * 60 * 1000
+      : unit === "hour"
+        ? amount * 60 * 60 * 1000
+        : unit === "day"
+          ? amount * DAY_MS
+          : unit === "week"
+            ? amount * 7 * DAY_MS
+            : unit === "month"
+              ? amount * 30 * DAY_MS
+              : amount * 365 * DAY_MS;
+  return new Date(now - ageMs);
+}
+
 export function selectOldestUnbroken(
   rows: DatedProjectLink[],
   brokenUrls: Set<string>,
