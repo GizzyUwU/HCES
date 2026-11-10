@@ -21,6 +21,10 @@ export default new Elysia()
         set.status = client.lastCode ?? 200;
         return res;
       } catch (err) {
+        if ((err as APIError)?.name === "StardanceCookieExpiredError") {
+          // Already logged with logger.error inside the scraper (-> Sentry).
+          throw err;
+        }
         logger.error("Failed getting goi stats data", {
           error: err,
         });
@@ -34,6 +38,8 @@ export default new Elysia()
       detail: {
         tags: ["Stardance", "Stardance / Generic"],
         security: [{ Header: [], StardanceCookie: [] }],
+        description:
+          "GOI-stats scrape. Returns 401 `stardance_cookie_expired` when the Stardance session cookie is expired/invalid (stale cookies previously returned all-zeros), or 401 `stardance_cookie_required` when no cookie was sent.",
       },
       response: {
         200: SDTypes["GoiStats"],

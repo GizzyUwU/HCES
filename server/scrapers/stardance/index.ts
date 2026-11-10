@@ -16,7 +16,26 @@ import {
 } from "@server/lib/brokenLinks";
 import TurndownService from "turndown";
 import { Histogram } from "prom-client";
-const parseNum = (text: string): number => Number(text.replace(/,/g, ""));
+const parseNum = (text: string): number => {
+  const cleaned = (text ?? "").replace(/,/g, "").trim();
+  if (
+    cleaned === "" ||
+    cleaned === "—" ||
+    cleaned === "-" ||
+    cleaned === "–"
+  )
+    return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+// Extract first numeric token from a cell (handles "▲1", "1,339.15 ✦", "52.7", "-", "—").
+const numFromCell = (text: string): number => {
+  const cleaned = (text ?? "").replace(/,/g, "");
+  const m = cleaned.match(/-?[\d.]+/);
+  if (!m) return 0;
+  const n = Number(m[0]);
+  return Number.isFinite(n) ? n : 0;
+};
 const turndown = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
@@ -189,32 +208,72 @@ export default class Stardance {
     return normalizeItems;
   }
 
+  private isAuthFailureHtml(html: string, res: Response): boolean {
+    if (res.status === 401 || res.status === 403) return true;
+    const url = res.url ?? "";
+    // fetch follows redirects: an expired cookie lands back on "/" or /login
+    if (
+      res.redirected &&
+      !url.includes("/admin/certification") &&
+      !url.includes("/admin%2Fcertification")
+    )
+      return true;
+    const lowered = html.slice(0, 8000).toLowerCase();
+    if (
+      lowered.includes('name="login"') ||
+      lowered.includes("/auth/") ||
+      lowered.includes("sign in") ||
+      lowered.includes("log in")
+    ) {
+      // Only treat as auth failure when dashboard markers are also missing,
+      // so we don't false-positive on legit pages mentioning login.
+      const probe = load(html);
+      if (
+        probe(".ysws-dashboard").length === 0 &&
+        probe(".ysws-queue").length === 0 &&
+        probe('td[data-label="ID"]').length === 0
+      )
+        return true;
+    }
+    return false;
+  }
+
   private async goiReviewerLb(
     $: CheerioAPI,
     rows: Element[],
   ): Promise<Static<(typeof SDTypes)["GoiStats"]>["reviewerLb"]> {
-    return rows.map((bRow) => {
-      const row = $(bRow);
-      const cells = row.find("td");
-      const reviewer = cells.eq(1).find("a").text().trim();
-      const devlogsLastThreeDays = Number(cells.eq(2).text().trim());
-      const lockedInSoFarThisWeek = Number(
-        cells.eq(3).text().replace(/\s+/g, " ").trim(),
+    return rows
+      .map((bRow) => {
+        const row = $(bRow);
+        const cells = row.find("td");
+        // Guard against header rows or unexpected layouts (site now has
+        // extra "This week / Past 7 days / Days on top" columns appended).
+        if (cells.length < 7) return null;
+        const reviewer =
+          cells.eq(1).find("a").text().trim() || cells.eq(1).text().trim();
+        if (!reviewer) return null;
+        const devlogsLastThreeDays = numFromCell(cells.eq(2).text());
+        const lockedInSoFarThisWeek = numFromCell(cells.eq(3).text());
+        const projectsReviewedToday = numFromCell(cells.eq(4).text());
+        const projectsReviewedLastThreeDays = numFromCell(cells.eq(5).text());
+        const stardustEarnt = numFromCell(cells.eq(6).text());
+        const lockedInStatus = row.hasClass("ysws-dashboard__row--on-pace");
+        return {
+          reviewer,
+          devlogsLastThreeDays,
+          lockedInStatus,
+          lockedInSoFarThisWeek,
+          projectsReviewedToday,
+          projectsReviewedLastThreeDays,
+          stardustEarnt,
+        };
+      })
+      .filter(
+        (
+          r,
+        ): r is Static<(typeof SDTypes)["GoiStats"]>["reviewerLb"][number] =>
+          r !== null,
       );
-      const projectsReviewedToday = Number(cells.eq(4).text().trim());
-      const projectsReviewedLastThreeDays = Number(cells.eq(5).text().trim());
-      const stardustEarnt = Number(cells.eq(6).text().trim());
-      const lockedInStatus = row.hasClass("ysws-dashboard__row--on-pace");
-      return {
-        reviewer,
-        devlogsLastThreeDays,
-        lockedInStatus,
-        lockedInSoFarThisWeek,
-        projectsReviewedToday,
-        projectsReviewedLastThreeDays,
-        stardustEarnt,
-      };
-    });
   }
 
   private async goiReviewerGraph(
@@ -402,19 +461,12 @@ export default class Stardance {
 
       this.lastCode = res.status;
 
-      if (
-        typeof html !== "string" ||
-        !(
-          String(res.headers.get("content-type")) ??
-          String(res.headers.get("Content-Type")) ??
-          ""
-        ).includes("text/html")
-      ) {
+      const contentType = res.headers.get("content-type") ?? "";
+      const mainContentType = resMainPage.headers.get("content-type") ?? "";
+
+      if (typeof html !== "string" || !contentType.includes("text/html")) {
         this.logger.warn("GOI Stats endpoint didn't return HTML", {
-          contentType:
-            String(res.headers.get("Content-Type")) ??
-            String(res.headers.get("content-type")) ??
-            "",
+          contentType,
           status: res.status,
         });
         return null;
@@ -422,20 +474,31 @@ export default class Stardance {
 
       if (
         typeof htmlMain !== "string" ||
-        !(
-          String(resMainPage.headers.get("content-type")) ??
-          String(resMainPage.headers.get("Content-Type")) ??
-          ""
-        ).includes("text/html")
+        !mainContentType.includes("text/html")
       ) {
         this.logger.warn("GOI Stats main page endpoint didn't return HTML", {
-          contentType:
-            String(resMainPage.headers.get("Content-Type")) ??
-            String(resMainPage.headers.get("content-type")) ??
-            "",
+          contentType: mainContentType,
           status: resMainPage.status,
         });
         return null;
+      }
+
+      // Expired/invalid cookie: Stardance redirects to "/" (Home) which is
+      // still text/html, so without this check we'd silently return all zeros.
+      if (
+        this.isAuthFailureHtml(html, res) ||
+        this.isAuthFailureHtml(htmlMain, resMainPage)
+      ) {
+        this.logger.error("GOI stats scrape failed: stardance cookie expired", {
+          dashboardStatus: res.status,
+          dashboardUrl: res.url,
+          mainStatus: resMainPage.status,
+          mainUrl: resMainPage.url,
+        });
+        const { StardanceCookieExpiredError } = await import(
+          "@server/lib/error"
+        );
+        throw new StardanceCookieExpiredError();
       }
 
       const $ = load(html);
@@ -446,13 +509,21 @@ export default class Stardance {
       const graph = await this.goiReviewerGraph($);
       const personalStats = await this.goiPersonalStats($);
 
-      const myUsername = $(".sidebar__user-meta-handle")
-        .text()
+      const myUsername = (
+        $(".sidebar__user-meta-handle").text() ||
+        main(".sidebar__user-meta-handle").text()
+      )
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^@/, "");
 
-      const queueRows = main("table tbody tr").toArray();
+      // Scope to the review queue table only: the page also contains the
+      // reviewer leaderboard table, which must not be counted as queue rows.
+      const queueRows = main("table tbody tr")
+        .filter(
+          (_, el) => main(el).find('td[data-label="ID"]').length > 0,
+        )
+        .toArray();
 
       let queueCount = 0;
       let pendingHours = 0;
@@ -590,6 +661,32 @@ export default class Stardance {
         },
       );
 
+      // Never silently return all-zeros: that shape means we parsed a
+      // logged-out page (expired cookie) or the markup changed. Surface it
+      // as an error (logged via logger.error -> Sentry) instead.
+      if (
+        !myUsername &&
+        reviewerLb.length === 0 &&
+        queueCount === 0 &&
+        graph.dates.length === 0
+      ) {
+        this.logger.error(
+          "GOI stats scrape returned empty: likely expired cookie or markup change",
+          {
+            dashboardStatus: res.status,
+            dashboardUrl: res.url,
+            mainStatus: resMainPage.status,
+            mainUrl: resMainPage.url,
+            lbRowsFound: lbRows.length,
+            queueRowsFound: queueRows.length,
+          },
+        );
+        const { StardanceCookieExpiredError } = await import(
+          "@server/lib/error"
+        );
+        throw new StardanceCookieExpiredError();
+      }
+
       return {
         myUsername,
         reviewerLb,
@@ -618,6 +715,7 @@ export default class Stardance {
         categories,
       };
     } catch (err: any) {
+      if (err?.name === "StardanceCookieExpiredError") throw err;
       this.logger.warn("GOI stats scrape failed", { error: err });
       return null;
     }

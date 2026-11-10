@@ -13,3 +13,10 @@ export class APIError extends Error {
     this.status = status;
   }
 }
+
+export class StardanceCookieExpiredError extends APIError {
+  constructor() {
+    super({ status: 401, msg: "stardance_cookie_expired" });
+    this.name = "StardanceCookieExpiredError";
+  }
+}
